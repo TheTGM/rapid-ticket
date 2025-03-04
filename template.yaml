@@ -224,8 +224,8 @@ Resources:
       AllocatedStorage: 20
       DBInstanceClass: db.t3.micro
       DBName: !Ref DatabaseName
-      Engine: mysql
-      EngineVersion: 8.0
+      Engine: postgres
+      EngineVersion: 16.1
       MasterUsername: !Ref DatabaseUsername
       MasterUserPassword: !Ref DatabasePassword
       DBSubnetGroupName: !Ref DBSubnetGroup
@@ -233,6 +233,9 @@ Resources:
         - !GetAtt RDSSecurityGroup.GroupId
       MultiAZ: false
       StorageType: gp2
+      BackupRetentionPeriod: 7
+      PubliclyAccessible: false
+      DeletionProtection: true
 
   # ElastiCache (Redis)
   ElastiCacheSubnetGroup:
@@ -511,130 +514,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
-      # DefinitionBody:
-      #   swagger: '2.0'
-      #   info:
-      #     title: Reservation API
-      #     version: '1.0'
-      #   paths:
-      #     /v1/functions-show/{proxy+}:
-      #       get:
-      #         x-amazon-apigateway-integration:
-      #           uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionsShowLambda.Arn}/invocations
-      #           passthroughBehavior: when_no_match
-      #           httpMethod: POST
-      #           type: aws_proxy
-      #         responses:
-      #           '200':
-      #             description: OK
-      #         security:
-      #           - TokenAuthorizer: []
-      #       options:
-      #         consumes:
-      #           - application/json
-      #         produces:
-      #           - application/json
-      #         responses:
-      #           '200':
-      #             description: OK
-      #             headers:
-      #               Access-Control-Allow-Origin:
-      #                 type: string
-      #               Access-Control-Allow-Methods:
-      #                 type: string
-      #               Access-Control-Allow-Headers:
-      #                 type: string
-      #         x-amazon-apigateway-integration:
-      #           type: mock
-      #           requestTemplates:
-      #             application/json: '{"statusCode": 200}'
-      #           responses:
-      #             default:
-      #               statusCode: 200
-      #               responseParameters:
-      #                 method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-      #                 method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-      #                 method.response.header.Access-Control-Allow-Origin: "'*'"
-      #               responseTemplates:
-      #                 application/json: "{}"
-      #     /v1/reservations/{proxy+}:
-      #       post:
-      #         x-amazon-apigateway-integration:
-      #           uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReservationLambda.Arn}/invocations
-      #           passthroughBehavior: when_no_match
-      #           httpMethod: POST
-      #           type: aws_proxy
-      #         responses:
-      #           '200':
-      #             description: OK
-      #         security:
-      #           - TokenAuthorizer: []
-      #       options:
-      #         consumes:
-      #           - application/json
-      #         produces:
-      #           - application/json
-      #         responses:
-      #           '200':
-      #             description: OK
-      #             headers:
-      #               Access-Control-Allow-Origin:
-      #                 type: string
-      #               Access-Control-Allow-Methods:
-      #                 type: string
-      #               Access-Control-Allow-Headers:
-      #                 type: string
-      #         x-amazon-apigateway-integration:
-      #           type: mock
-      #           requestTemplates:
-      #             application/json: '{"statusCode": 200}'
-      #           responses:
-      #             default:
-      #               statusCode: 200
-      #               responseParameters:
-      #                 method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-      #                 method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-      #                 method.response.header.Access-Control-Allow-Origin: "'*'"
-      #               responseTemplates:
-      #                 application/json: "{}"
-      #     /v1/shows/public/{proxy+}:
-      #       get:
-      #         x-amazon-apigateway-integration:
-      #           uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShowsLambda.Arn}/invocations
-      #           passthroughBehavior: when_no_match
-      #           httpMethod: POST
-      #           type: aws_proxy
-      #         responses:
-      #           '200':
-      #             description: OK
-      #       options:
-      #         consumes:
-      #           - application/json
-      #         produces:
-      #           - application/json
-      #         responses:
-      #           '200':
-      #             description: OK
-      #             headers:
-      #               Access-Control-Allow-Origin:
-      #                 type: string
-      #               Access-Control-Allow-Methods:
-      #                 type: string
-      #               Access-Control-Allow-Headers:
-      #                 type: string
-      #         x-amazon-apigateway-integration:
-      #           type: mock
-      #           requestTemplates:
-      #             application/json: '{"statusCode": 200}'
-      #           responses:
-      #             default:
-      #               statusCode: 200
-      #               responseParameters:
-      #                 method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-      #                 method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-      #                 method.response.header.Access-Control-Allow-Origin: "'*'"
-      #               responseTemplates:
-      #                 application/json: "{}"
+
 
 Outputs:
   ApiEndpoint:
