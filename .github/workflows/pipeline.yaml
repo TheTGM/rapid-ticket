@@ -1,4 +1,4 @@
-name: Reservas App Pipeline
+name: Reservas App CI/CD Pipeline
 
 on:
   push:
@@ -16,30 +16,19 @@ permissions:
 
 env:
   SAM_TEMPLATE: template.yaml
+  AWS_REGION: us-east-1
   
-  # Configuración para entorno DEV
-  DEV_STACK_NAME: app-reservas-dev
-  DEV_REGION: us-east-1
-  DEV_DATABASE_USERNAME: ${{ secrets.DEV_DATABASE_USERNAME }}
-  DEV_DATABASE_PASSWORD: ${{ secrets.DEV_DATABASE_PASSWORD }}
-  DEV_DATABASE_NAME: ${{ secrets.DEV_DATABASE_NAME }}
-  DEV_TICKET_SECRET_MANAGER: ${{ secrets.DEV_TICKET_SECRET_MANAGER }}
-
-  # Configuración para entorno STAGING
-  STAGING_STACK_NAME: app-reservas-staging
-  STAGING_REGION: us-east-1
-  STAGING_DATABASE_USERNAME: ${{ secrets.STAGING_DATABASE_USERNAME }}
-  STAGING_DATABASE_PASSWORD: ${{ secrets.STAGING_DATABASE_PASSWORD }}
-  STAGING_DATABASE_NAME: ${{ secrets.STAGING_DATABASE_NAME }}
-  STAGING_TICKET_SECRET_MANAGER: ${{ secrets.STAGING_TICKET_SECRET_MANAGER }}
-
-  # Configuración para entorno PROD
-  PROD_STACK_NAME: app-reservas-prod
-  PROD_REGION: us-east-1
-  PROD_DATABASE_USERNAME: ${{ secrets.PROD_DATABASE_USERNAME }}
-  PROD_DATABASE_PASSWORD: ${{ secrets.PROD_DATABASE_PASSWORD }}
-  PROD_DATABASE_NAME: ${{ secrets.PROD_DATABASE_NAME }}
-  PROD_TICKET_SECRET_MANAGER: ${{ secrets.PROD_TICKET_SECRET_MANAGER }}
+  # SAM CLI configuración
+  PIPELINE_USER: arn:aws:iam::590184057686:user/aws-sam-cli-managed-tickets-meli-pipel-PipelineUser-9rkg145QXMA0
+  PIPELINE_EXECUTION_ROLE: arn:aws:iam::590184057686:role/aws-sam-cli-managed-tickets-m-PipelineExecutionRole-PPr1VqA21kkt
+  CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::590184057686:role/aws-sam-cli-managed-ticke-CloudFormationExecutionRo-xn4QpQMTrkJD
+  ARTIFACTS_BUCKET: aws-sam-cli-managed-tickets-meli-p-artifactsbucket-yu0wicf9ro9u
+  IMAGE_REPOSITORY: 590184057686.dkr.ecr.us-east-1.amazonaws.com/aws-sam-cli-managed-tickets-meli-pipeline-resources-imagerepository-vdb33oeux6db
+  
+  # Configuración para todos los entornos
+  TICKET_SECRET_MANAGER: ${{ secrets.TICKET_SECRET_MANAGER }}
+  DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+  DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
 
 jobs:
   delete-feature:
@@ -56,15 +45,19 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.DEV_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
           
       - name: Eliminar stack de feature branch
         env:
           FEATURE_BRANCH_NAME: ${{ github.event.ref }}
         run: |
+          # Crear nombre de stack basado en nombre de la rama feature
+          STACK_NAME="reservas-$(echo ${FEATURE_BRANCH_NAME##*/} | tr -cd '[a-zA-Z0-9-]')"
+          echo "Eliminando stack: $STACK_NAME"
+          
           sam delete \
-            --stack-name $(echo ${FEATURE_BRANCH_NAME##*/} | tr -cd '[a-zA-Z0-9-]') \
-            --region ${DEV_REGION} \
+            --stack-name ${STACK_NAME} \
+            --region ${AWS_REGION} \
             --no-prompts
 
   build-and-deploy-feature:
@@ -76,55 +69,44 @@ jobs:
         with:
           use-installer: true
           
+      - name: Construir aplicación
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.DEV_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
           
-      # Crear repositorios de imágenes para cada Lambda
-      - name: Crear repositorios ECR si no existen
+      - name: Desplegar feature branch en entorno dev
+        shell: bash
         run: |
-          # Definir los nombres de los repositorios para cada lambda
-          REPOS=("functions-shows" "reservation" "reservation-processor" "shows")
+          # Crear nombre de stack basado en nombre de la rama feature
+          STACK_NAME="reservas-$(echo ${GITHUB_REF##*/} | tr -cd '[a-zA-Z0-9-]')"
+          echo "Desplegando a stack: $STACK_NAME"
           
-          for REPO in "${REPOS[@]}"; do
-            echo "Verificando repositorio: $REPO"
-            aws ecr describe-repositories --repository-names $REPO || aws ecr create-repository --repository-name $REPO
-          done
-      
-      # Obtener la URL base del repositorio ECR
-      - name: Obtener URL base de ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${DEV_REGION}.amazonaws.com" >> $GITHUB_ENV
+          DATABASE_NAME="reservas_${GITHUB_REF##*/}"
+          # Truncar nombre de BD si es muy largo
+          if [ ${#DATABASE_NAME} -gt 64 ]; then
+            DATABASE_NAME="${DATABASE_NAME:0:64}"
+          fi
           
-      - name: Construir y desplegar aplicación
-        run: |
-          # Crear bucket S3 para despliegue si no existe
-          DEPLOY_BUCKET="app-reservas-deploy-$(date +%Y%m%d%H%M%S)"
-          aws s3 mb s3://${DEPLOY_BUCKET}
-          
-          # Construir la aplicación
-          sam build --template ${SAM_TEMPLATE} --use-container
-          
-          # Desplegar en la rama feature
           sam deploy \
-            --stack-name $(echo ${GITHUB_REF##*/} | tr -cd '[a-zA-Z0-9-]') \
+            --stack-name ${STACK_NAME} \
             --capabilities CAPABILITY_IAM \
-            --region ${DEV_REGION} \
+            --region ${AWS_REGION} \
             --parameter-overrides \
               AppName=reservas \
               AppEnv=dev \
-              DatabaseUsername=${DEV_DATABASE_USERNAME} \
-              DatabasePassword=${DEV_DATABASE_PASSWORD} \
-              DatabaseName=${DEV_DATABASE_NAME} \
-              TicketSecretManager=${DEV_TICKET_SECRET_MANAGER} \
-            --s3-bucket ${DEPLOY_BUCKET} \
-            --image-repository ${ECR_REGISTRY} \
+              DatabaseUsername=${DATABASE_USERNAME} \
+              DatabasePassword=${DATABASE_PASSWORD} \
+              DatabaseName=${DATABASE_NAME} \
+              TicketSecretManager=${TICKET_SECRET_MANAGER} \
+            --s3-bucket ${ARTIFACTS_BUCKET} \
+            --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
-            --no-confirm-changeset
+            --role-arn ${CLOUDFORMATION_EXECUTION_ROLE}
 
   build-and-deploy-dev:
     if: github.ref == 'refs/heads/develop'
@@ -135,55 +117,34 @@ jobs:
         with:
           use-installer: true
           
+      - name: Construir aplicación
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.DEV_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
           
-      # Crear repositorios de imágenes para cada Lambda
-      - name: Crear repositorios ECR si no existen
+      - name: Desplegar en entorno dev
+        shell: bash
         run: |
-          # Definir los nombres de los repositorios para cada lambda
-          REPOS=("functions-shows" "reservation" "reservation-processor" "shows")
-          
-          for REPO in "${REPOS[@]}"; do
-            echo "Verificando repositorio: $REPO"
-            aws ecr describe-repositories --repository-names $REPO || aws ecr create-repository --repository-name $REPO
-          done
-      
-      # Obtener la URL base del repositorio ECR
-      - name: Obtener URL base de ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${DEV_REGION}.amazonaws.com" >> $GITHUB_ENV
-          
-      - name: Construir y desplegar en DEV
-        run: |
-          # Crear bucket S3 para despliegue si no existe
-          DEPLOY_BUCKET="app-reservas-deploy-$(date +%Y%m%d%H%M%S)"
-          aws s3 mb s3://${DEPLOY_BUCKET}
-          
-          # Construir la aplicación
-          sam build --template ${SAM_TEMPLATE} --use-container
-          
-          # Desplegar en entorno DEV
           sam deploy \
-            --stack-name ${DEV_STACK_NAME} \
+            --stack-name reservas-dev \
             --capabilities CAPABILITY_IAM \
-            --region ${DEV_REGION} \
+            --region ${AWS_REGION} \
             --parameter-overrides \
               AppName=reservas \
               AppEnv=dev \
-              DatabaseUsername=${DEV_DATABASE_USERNAME} \
-              DatabasePassword=${DEV_DATABASE_PASSWORD} \
-              DatabaseName=${DEV_DATABASE_NAME} \
-              TicketSecretManager=${DEV_TICKET_SECRET_MANAGER} \
-            --s3-bucket ${DEPLOY_BUCKET} \
-            --image-repository ${ECR_REGISTRY} \
+              DatabaseUsername=${DATABASE_USERNAME} \
+              DatabasePassword=${DATABASE_PASSWORD} \
+              DatabaseName=reservas_dev \
+              TicketSecretManager=${TICKET_SECRET_MANAGER} \
+            --s3-bucket ${ARTIFACTS_BUCKET} \
+            --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
-            --no-confirm-changeset
+            --role-arn ${CLOUDFORMATION_EXECUTION_ROLE}
 
   deploy-staging:
     if: github.ref == 'refs/heads/develop'
@@ -196,46 +157,35 @@ jobs:
         with:
           use-installer: true
           
+      - name: Construir aplicación
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+          
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.STAGING_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
           
-      # Obtener la URL base del repositorio ECR
-      - name: Obtener URL base de ECR
+      - name: Desplegar en entorno staging
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${STAGING_REGION}.amazonaws.com" >> $GITHUB_ENV
-          
-      - name: Construir y desplegar en STAGING
-        run: |
-          # Crear bucket S3 para despliegue si no existe
-          DEPLOY_BUCKET="app-reservas-deploy-staging-$(date +%Y%m%d%H%M%S)"
-          aws s3 mb s3://${DEPLOY_BUCKET}
-          
-          # Construir la aplicación
-          sam build --template ${SAM_TEMPLATE} --use-container
-          
-          # Desplegar en entorno STAGING
           sam deploy \
-            --stack-name ${STAGING_STACK_NAME} \
+            --stack-name reservas-staging \
             --capabilities CAPABILITY_IAM \
-            --region ${STAGING_REGION} \
+            --region ${AWS_REGION} \
             --parameter-overrides \
               AppName=reservas \
               AppEnv=staging \
-              DatabaseUsername=${STAGING_DATABASE_USERNAME} \
-              DatabasePassword=${STAGING_DATABASE_PASSWORD} \
-              DatabaseName=${STAGING_DATABASE_NAME} \
-              TicketSecretManager=${STAGING_TICKET_SECRET_MANAGER} \
-            --s3-bucket ${DEPLOY_BUCKET} \
-            --image-repository ${ECR_REGISTRY} \
+              DatabaseUsername=${DATABASE_USERNAME} \
+              DatabasePassword=${DATABASE_PASSWORD} \
+              DatabaseName=reservas_staging \
+              TicketSecretManager=${TICKET_SECRET_MANAGER} \
+            --s3-bucket ${ARTIFACTS_BUCKET} \
+            --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
-            --no-confirm-changeset
+            --role-arn ${CLOUDFORMATION_EXECUTION_ROLE}
 
-  build-and-deploy-prod:
+  deploy-prod:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production  # Requiere aprobación manual
@@ -245,52 +195,30 @@ jobs:
         with:
           use-installer: true
           
+      - name: Construir aplicación
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+        
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.PROD_REGION }}
-      
-      # Crear repositorios de imágenes para cada Lambda
-      - name: Crear repositorios ECR si no existen
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: Desplegar en entorno producción
         run: |
-          # Definir los nombres de los repositorios para cada lambda
-          REPOS=("functions-shows" "reservation" "reservation-processor" "shows")
-          
-          for REPO in "${REPOS[@]}"; do
-            echo "Verificando repositorio: $REPO"
-            aws ecr describe-repositories --repository-names $REPO || aws ecr create-repository --repository-name $REPO
-          done
-      
-      # Obtener la URL base del repositorio ECR
-      - name: Obtener URL base de ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${PROD_REGION}.amazonaws.com" >> $GITHUB_ENV
-          
-      - name: Construir y desplegar en PROD
-        run: |
-          # Crear bucket S3 para despliegue si no existe
-          DEPLOY_BUCKET="app-reservas-deploy-prod-$(date +%Y%m%d%H%M%S)"
-          aws s3 mb s3://${DEPLOY_BUCKET}
-          
-          # Construir la aplicación
-          sam build --template ${SAM_TEMPLATE} --use-container
-          
-          # Desplegar en entorno PROD
           sam deploy \
-            --stack-name ${PROD_STACK_NAME} \
+            --stack-name reservas-prod \
             --capabilities CAPABILITY_IAM \
-            --region ${PROD_REGION} \
+            --region ${AWS_REGION} \
             --parameter-overrides \
               AppName=reservas \
               AppEnv=prod \
-              DatabaseUsername=${PROD_DATABASE_USERNAME} \
-              DatabasePassword=${PROD_DATABASE_PASSWORD} \
-              DatabaseName=${PROD_DATABASE_NAME} \
-              TicketSecretManager=${PROD_TICKET_SECRET_MANAGER} \
-            --s3-bucket ${DEPLOY_BUCKET} \
-            --image-repository ${ECR_REGISTRY} \
+              DatabaseUsername=${DATABASE_USERNAME} \
+              DatabasePassword=${DATABASE_PASSWORD} \
+              DatabaseName=reservas_prod \
+              TicketSecretManager=${TICKET_SECRET_MANAGER} \
+            --s3-bucket ${ARTIFACTS_BUCKET} \
+            --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
-            --no-confirm-changeset
+            --role-arn ${CLOUDFORMATION_EXECUTION_ROLE}
