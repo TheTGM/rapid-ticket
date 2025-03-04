@@ -11,3 +11,5 @@ api.post('/testShow', async (req, res, next) => {
         next(error);
     }
 });
+
+module.exports = api;
