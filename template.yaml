@@ -295,6 +295,29 @@ Resources:
       Roles:
         - !Ref LambdaExecutionRole
 
+  # API Gateway
+  BackendApiGateway:
+    Type: AWS::Serverless::Api
+    DependsOn: ApiGatewayAccount
+    Properties:
+      StageName: !Ref AppEnv
+      TracingEnabled: true
+      MethodSettings:
+        - LoggingLevel: INFO
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: true
+          DataTraceEnabled: true
+      Auth:
+        DefaultAuthorizer: TokenAuthorizer
+        Authorizers:
+          TokenAuthorizer:
+            FunctionPayloadType: TOKEN
+            FunctionArn: !GetAtt TokenAuthorizerFunction.Arn
+            Identity:
+              Header: Authorization
+            AuthorizerCacheEnabled: false
+
   # Lambdas
   FunctionsShowLambda:
     Type: AWS::Serverless::Function
@@ -487,29 +510,6 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
-
-  # API Gateway
-  BackendApiGateway:
-    Type: AWS::Serverless::Api
-    DependsOn: ApiGatewayAccount
-    Properties:
-      StageName: !Ref AppEnv
-      TracingEnabled: true
-      MethodSettings:
-        - LoggingLevel: INFO
-          ResourcePath: '/*'
-          HttpMethod: '*'
-          MetricsEnabled: true
-          DataTraceEnabled: true
-      Auth:
-        DefaultAuthorizer: TokenAuthorizer
-        Authorizers:
-          TokenAuthorizer:
-            FunctionPayloadType: TOKEN
-            FunctionArn: !GetAtt TokenAuthorizerFunction.Arn
-            Identity:
-              Header: Authorization
-            AuthorizerCacheEnabled: false
       # DefinitionBody:
       #   swagger: '2.0'
       #   info:
