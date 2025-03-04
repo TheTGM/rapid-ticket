@@ -3,7 +3,7 @@ const { StatusCodes } = require('http-status-codes');
 const api = express.Router();
 
 
-api.post('/testShow', async (req, res, next) => {
+api.get('/testShow', async (req, res, next) => {
     try {
         return res.status(StatusCodes.OK).json({ message: "ok" });
     } catch (error) {
