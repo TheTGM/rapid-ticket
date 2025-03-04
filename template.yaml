@@ -1,0 +1,639 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Arquitectura SAM para aplicación de reservas
+
+Parameters:
+  AppName:
+    Type: String
+    Default: app
+    Description: Nombre de la aplicación
+    
+  AppEnv:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Entorno de la aplicación
+  
+  VpcCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR para la VPC
+  
+  DatabaseUsername:
+    Type: String
+    Default: admin
+    Description: Nombre de usuario para la base de datos
+  
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    Description: Contraseña para la base de datos
+  
+  DatabaseName:
+    Type: String
+    Default: appdb
+    Description: Nombre de la base de datos
+    
+  TicketSecretManager:
+    Type: String
+    Description: ARN del Secret Manager para credenciales
+
+Resources:
+  # VPC y Subredes
+  AppVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: app-vpc
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref AppVPC
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCIDR, 6, 8]]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: app-public-subnet-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref AppVPC
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCIDR, 6, 8]]
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: app-public-subnet-2
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref AppVPC
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCIDR, 6, 8]]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: app-private-subnet-1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref AppVPC
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCIDR, 6, 8]]
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: app-private-subnet-2
+
+  # Internet Gateway para acceso público
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: app-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref AppVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # NAT Gateway para que las subredes privadas tengan salida a internet
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: app-nat-gateway
+
+  # Tablas de rutas
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref AppVPC
+      Tags:
+        - Key: Name
+          Value: app-public-route-table
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref AppVPC
+      Tags:
+        - Key: Name
+          Value: app-private-route-table
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Grupos de seguridad
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Grupo de seguridad para las funciones Lambda
+      VpcId: !Ref AppVPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Grupo de seguridad para RDS
+      VpcId: !Ref AppVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+
+  ElastiCacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Grupo de seguridad para ElastiCache
+      VpcId: !Ref AppVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+
+  # RDS (Base de datos)
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Grupo de subredes para RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: 20
+      DBInstanceClass: db.t3.micro
+      DBName: !Ref DatabaseName
+      Engine: mysql
+      EngineVersion: 8.0
+      MasterUsername: !Ref DatabaseUsername
+      MasterUserPassword: !Ref DatabasePassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt RDSSecurityGroup.GroupId
+      MultiAZ: false
+      StorageType: gp2
+
+  # ElastiCache (Redis)
+  ElastiCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Grupo de subredes para ElastiCache
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  ElastiCacheCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      Engine: redis
+      CacheNodeType: cache.t3.micro
+      NumCacheNodes: 1
+      VpcSecurityGroupIds:
+        - !GetAtt ElastiCacheSecurityGroup.GroupId
+      CacheSubnetGroupName: !Ref ElastiCacheSubnetGroup
+
+  # SQS (Cola de mensajes FIFO)
+  ReservationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${AppName}-ReservationQueue-${AppEnv}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600  # 14 días
+
+  # IAM Roles para Lambdas
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaSQSPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: LambdaSQSPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt ReservationQueue.Arn
+      Roles:
+        - !Ref LambdaExecutionRole
+
+  # Lambdas
+  FunctionsShowLambda:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: functions_shows.Dockerfile
+      DockerContext: ./
+    Properties:
+      FunctionName: !Sub ${AppName}-lmb-functions-show-${AppEnv}
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Role: !GetAtt LambdaExecutionRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt RDSInstance.Endpoint.Address
+          DB_PORT: !GetAtt RDSInstance.Endpoint.Port
+          DB_NAME: !Ref DatabaseName
+          CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+          CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref TicketSecretManager
+      Events:
+        FunctionsShowApi:
+          Type: Api
+          Properties:
+            Path: /v1/functions-show/{proxy+}
+            Method: ANY
+            RestApiId: !Ref BackendApiGateway
+
+  ReservationLambda:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: reservation.Dockerfile
+      DockerContext: ./
+    Properties:
+      FunctionName: !Sub ${AppName}-lmb-reservation-${AppEnv}
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Role: !GetAtt LambdaExecutionRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt RDSInstance.Endpoint.Address
+          DB_PORT: !GetAtt RDSInstance.Endpoint.Port
+          DB_NAME: !Ref DatabaseName
+          CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+          CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
+          QUEUE_URL: !Ref ReservationQueue
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref TicketSecretManager
+      Events:
+        ReservationApi:
+          Type: Api
+          Properties:
+            Path: /v1/reservations/{proxy+}
+            Method: ANY
+            RestApiId: !Ref BackendApiGateway
+
+  ReservationProcessLambda:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: reservation_processor.Dockerfile
+      DockerContext: ./
+    Properties:
+      FunctionName: !Sub ${AppName}-lmb-reservation-process-${AppEnv}
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Role: !GetAtt LambdaExecutionRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt RDSInstance.Endpoint.Address
+          DB_PORT: !GetAtt RDSInstance.Endpoint.Port
+          DB_NAME: !Ref DatabaseName
+          CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+          CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref TicketSecretManager
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ReservationQueue.Arn
+            BatchSize: 10
+
+  ShowsLambda:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: shows.Dockerfile
+      DockerContext: ./
+    Properties:
+      FunctionName: !Sub ${AppName}-lmb-shows-${AppEnv}
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Role: !GetAtt LambdaExecutionRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt RDSInstance.Endpoint.Address
+          DB_PORT: !GetAtt RDSInstance.Endpoint.Port
+          DB_NAME: !Ref DatabaseName
+          CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+          CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref TicketSecretManager
+      Events:
+        ShowsPublicApi:
+          Type: Api
+          Properties:
+            Path: /v1/shows/public/{proxy+}
+            Method: ANY
+            RestApiId: !Ref BackendApiGateway
+            Auth: 
+              Authorizer: NONE
+
+  # Lambda Authorizer
+  TokenAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AppName}-lmb-authorizer-${AppEnv}
+      CodeUri: ./functions/authorizer/
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  # API Gateway Account para habilitar CloudWatch logs
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayLoggingRole.Arn
+
+  # Rol para CloudWatch logs del API Gateway
+  ApiGatewayLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
+
+  # API Gateway
+  BackendApiGateway:
+    Type: AWS::Serverless::Api
+    DependsOn: ApiGatewayAccount
+    Properties:
+      StageName: !Ref AppEnv
+      TracingEnabled: true
+      MethodSettings:
+        - LoggingLevel: INFO
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: true
+          DataTraceEnabled: true
+      Auth:
+        DefaultAuthorizer: TokenAuthorizer
+        Authorizers:
+          TokenAuthorizer:
+            FunctionPayloadType: TOKEN
+            FunctionArn: !GetAtt TokenAuthorizerFunction.Arn
+            Identity:
+              Header: Authorization
+            AuthorizerCacheEnabled: false
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          title: Reservation API
+          version: '1.0'
+        paths:
+          /v1/functions-show/{proxy+}:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionsShowLambda.Arn}/invocations
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                '200':
+                  description: OK
+              security:
+                - TokenAuthorizer: []
+            options:
+              consumes:
+                - application/json
+              produces:
+                - application/json
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                    responseTemplates:
+                      application/json: "{}"
+          /v1/reservations/{proxy+}:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReservationLambda.Arn}/invocations
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                '200':
+                  description: OK
+              security:
+                - TokenAuthorizer: []
+            options:
+              consumes:
+                - application/json
+              produces:
+                - application/json
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                    responseTemplates:
+                      application/json: "{}"
+          /v1/shows/public/{proxy+}:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShowsLambda.Arn}/invocations
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                '200':
+                  description: OK
+            options:
+              consumes:
+                - application/json
+              produces:
+                - application/json
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                    responseTemplates:
+                      application/json: "{}"
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway Endpoint URL"
+    Value: !Sub "https://${BackendApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${AppEnv}"
+
+  RDSEndpoint:
+    Description: "Endpoint de la base de datos RDS"
+    Value: !GetAtt RDSInstance.Endpoint.Address
+
+  ElastiCacheEndpoint:
+    Description: "Endpoint de ElastiCache"
+    Value: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+
+  QueueURL:
+    Description: "URL de la cola SQS"
+    Value: !Ref ReservationQueue

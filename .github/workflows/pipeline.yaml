@@ -1,0 +1,350 @@
+name: Reservas App Pipeline
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'develop'
+      - 'feature/**'
+  delete:
+    branches:
+      - 'feature/**'
+
+env:
+  PIPELINE_USER_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  PIPELINE_USER_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  SAM_TEMPLATE: template.yaml
+  
+  # Configuración para entorno DEV
+  DEV_STACK_NAME: app-reservas-dev
+  DEV_PIPELINE_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-dev-pipeline-role
+  DEV_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-dev-cloudformation-role
+  DEV_ARTIFACTS_BUCKET: aws-sam-cli-managed-dev-pipeline-artifactsbucket
+  DEV_IMAGE_REPOSITORY: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/aws-sam-cli-managed-dev-repository
+  DEV_REGION: us-east-1
+  DEV_DATABASE_USERNAME: ${{ secrets.DEV_DATABASE_USERNAME }}
+  DEV_DATABASE_PASSWORD: ${{ secrets.DEV_DATABASE_PASSWORD }}
+  DEV_DATABASE_NAME: ${{ secrets.DEV_DATABASE_NAME }}
+  DEV_TICKET_SECRET_MANAGER: ${{ secrets.DEV_TICKET_SECRET_MANAGER }}
+
+  # Configuración para entorno STAGING
+  STAGING_STACK_NAME: app-reservas-staging
+  STAGING_PIPELINE_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-staging-pipeline-role
+  STAGING_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-staging-cloudformation-role
+  STAGING_ARTIFACTS_BUCKET: aws-sam-cli-managed-staging-pipeline-artifactsbucket
+  STAGING_IMAGE_REPOSITORY: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/aws-sam-cli-managed-staging-repository
+  STAGING_REGION: us-east-1
+  STAGING_DATABASE_USERNAME: ${{ secrets.STAGING_DATABASE_USERNAME }}
+  STAGING_DATABASE_PASSWORD: ${{ secrets.STAGING_DATABASE_PASSWORD }}
+  STAGING_DATABASE_NAME: ${{ secrets.STAGING_DATABASE_NAME }}
+  STAGING_TICKET_SECRET_MANAGER: ${{ secrets.STAGING_TICKET_SECRET_MANAGER }}
+
+  # Configuración para entorno PROD
+  PROD_STACK_NAME: app-reservas-prod
+  PROD_PIPELINE_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-prod-pipeline-role
+  PROD_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-prod-cloudformation-role
+  PROD_ARTIFACTS_BUCKET: aws-sam-cli-managed-prod-pipeline-artifactsbucket
+  PROD_IMAGE_REPOSITORY: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/aws-sam-cli-managed-prod-repository
+  PROD_REGION: us-east-1
+  PROD_DATABASE_USERNAME: ${{ secrets.PROD_DATABASE_USERNAME }}
+  PROD_DATABASE_PASSWORD: ${{ secrets.PROD_DATABASE_PASSWORD }}
+  PROD_DATABASE_NAME: ${{ secrets.PROD_DATABASE_NAME }}
+  PROD_TICKET_SECRET_MANAGER: ${{ secrets.PROD_TICKET_SECRET_MANAGER }}
+
+jobs:
+  delete-feature:
+    if: startsWith(github.event.ref, 'feature') && github.event_name == 'delete'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Asumir rol de pipeline en dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.DEV_REGION }}
+          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: feature-deletion
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Eliminar stack de feature branch
+        env:
+          FEATURE_BRANCH_NAME: ${{ github.event.ref }}
+        run: |
+          sam delete \
+            --stack-name $(echo ${FEATURE_BRANCH_NAME##*/} | tr -cd '[a-zA-Z0-9-]') \
+            --region ${DEV_REGION} \
+            --no-prompts
+
+  build-and-deploy-feature:
+    if: startsWith(github.ref, 'refs/heads/feature')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          
+      - name: Construir aplicación
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+
+      - name: Asumir rol de pipeline en dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.DEV_REGION }}
+          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: feature-deployment
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Desplegar feature branch en entorno dev
+        shell: bash
+        run: |
+          sam deploy --stack-name $(echo ${GITHUB_REF##*/} | tr -cd '[a-zA-Z0-9-]') \
+            --capabilities CAPABILITY_IAM \
+            --region ${DEV_REGION} \
+            --parameter-overrides \
+              AppName=reservas \
+              AppEnv=dev \
+              DatabaseUsername=${DEV_DATABASE_USERNAME} \
+              DatabasePassword=${DEV_DATABASE_PASSWORD} \
+              DatabaseName=${DEV_DATABASE_NAME} \
+              TicketSecretManager=${DEV_TICKET_SECRET_MANAGER} \
+            --s3-bucket ${DEV_ARTIFACTS_BUCKET} \
+            --image-repository ${DEV_IMAGE_REPOSITORY} \
+            --no-fail-on-empty-changeset \
+            --role-arn ${DEV_CLOUDFORMATION_EXECUTION_ROLE}
+
+  build-and-package-dev:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          
+      - name: Construir recursos
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+        
+      - name: Asumir rol de pipeline en dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.DEV_REGION }}
+          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: dev-packaging
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Empaquetar artefactos para dev
+        run: |
+          sam package \
+            --s3-bucket ${DEV_ARTIFACTS_BUCKET} \
+            --image-repository ${DEV_IMAGE_REPOSITORY} \
+            --region ${DEV_REGION} \
+            --output-template-file packaged-dev.yaml
+            
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packaged-dev.yaml
+          path: packaged-dev.yaml
+          
+      - name: Asumir rol de pipeline en staging
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.STAGING_REGION }}
+          role-to-assume: ${{ env.STAGING_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: staging-packaging
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Empaquetar artefactos para staging
+        run: |
+          sam package \
+            --s3-bucket ${STAGING_ARTIFACTS_BUCKET} \
+            --image-repository ${STAGING_IMAGE_REPOSITORY} \
+            --region ${STAGING_REGION} \
+            --output-template-file packaged-staging.yaml
+            
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packaged-staging.yaml
+          path: packaged-staging.yaml
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop'
+    needs: [build-and-package-dev]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          
+      - uses: actions/download-artifact@v4
+        with:
+          name: packaged-dev.yaml
+          
+      - name: Asumir rol de pipeline en dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.DEV_REGION }}
+          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: dev-deployment
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Desplegar en entorno dev
+        run: |
+          sam deploy --stack-name ${DEV_STACK_NAME} \
+            --template packaged-dev.yaml \
+            --parameter-overrides \
+              AppName=reservas \
+              AppEnv=dev \
+              DatabaseUsername=${DEV_DATABASE_USERNAME} \
+              DatabasePassword=${DEV_DATABASE_PASSWORD} \
+              DatabaseName=${DEV_DATABASE_NAME} \
+              TicketSecretManager=${DEV_TICKET_SECRET_MANAGER} \
+            --capabilities CAPABILITY_IAM \
+            --region ${DEV_REGION} \
+            --s3-bucket ${DEV_ARTIFACTS_BUCKET} \
+            --image-repository ${DEV_IMAGE_REPOSITORY} \
+            --no-fail-on-empty-changeset \
+            --role-arn ${DEV_CLOUDFORMATION_EXECUTION_ROLE}
+
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop'
+    needs: [deploy-dev]
+    runs-on: ubuntu-latest
+    environment: staging  # Requiere aprobación manual
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          
+      - uses: actions/download-artifact@v4
+        with:
+          name: packaged-staging.yaml
+          
+      - name: Asumir rol de pipeline en staging
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.STAGING_REGION }}
+          role-to-assume: ${{ env.STAGING_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: staging-deployment
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Desplegar en entorno staging
+        run: |
+          sam deploy --stack-name ${STAGING_STACK_NAME} \
+            --template packaged-staging.yaml \
+            --parameter-overrides \
+              AppName=reservas \
+              AppEnv=staging \
+              DatabaseUsername=${STAGING_DATABASE_USERNAME} \
+              DatabasePassword=${STAGING_DATABASE_PASSWORD} \
+              DatabaseName=${STAGING_DATABASE_NAME} \
+              TicketSecretManager=${STAGING_TICKET_SECRET_MANAGER} \
+            --capabilities CAPABILITY_IAM \
+            --region ${STAGING_REGION} \
+            --s3-bucket ${STAGING_ARTIFACTS_BUCKET} \
+            --image-repository ${STAGING_IMAGE_REPOSITORY} \
+            --no-fail-on-empty-changeset \
+            --role-arn ${STAGING_CLOUDFORMATION_EXECUTION_ROLE}
+
+  build-and-package-prod:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          
+      - name: Construir recursos
+        run: sam build --template ${SAM_TEMPLATE} --use-container
+        
+      - name: Asumir rol de pipeline en prod
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.PROD_REGION }}
+          role-to-assume: ${{ env.PROD_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: prod-packaging
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Empaquetar artefactos para prod
+        run: |
+          sam package \
+            --s3-bucket ${PROD_ARTIFACTS_BUCKET} \
+            --image-repository ${PROD_IMAGE_REPOSITORY} \
+            --region ${PROD_REGION} \
+            --output-template-file packaged-prod.yaml
+            
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packaged-prod.yaml
+          path: packaged-prod.yaml
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/master'
+    needs: [build-and-package-prod]
+    runs-on: ubuntu-latest
+    environment: production  # Requiere aprobación manual
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          
+      - uses: actions/download-artifact@v4
+        with:
+          name: packaged-prod.yaml
+          
+      - name: Asumir rol de pipeline en prod
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.PROD_REGION }}
+          role-to-assume: ${{ env.PROD_PIPELINE_EXECUTION_ROLE }}
+          role-session-name: prod-deployment
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+          
+      - name: Desplegar en entorno producción
+        run: |
+          sam deploy --stack-name ${PROD_STACK_NAME} \
+            --template packaged-prod.yaml \
+            --parameter-overrides \
+              AppName=reservas \
+              AppEnv=prod \
+              DatabaseUsername=${PROD_DATABASE_USERNAME} \
+              DatabasePassword=${PROD_DATABASE_PASSWORD} \
+              DatabaseName=${PROD_DATABASE_NAME} \
+              TicketSecretManager=${PROD_TICKET_SECRET_MANAGER} \
+            --capabilities CAPABILITY_IAM \
+            --region ${PROD_REGION} \
+            --s3-bucket ${PROD_ARTIFACTS_BUCKET} \
+            --image-repository ${PROD_IMAGE_REPOSITORY} \
+            --no-fail-on-empty-changeset \
+            --role-arn ${PROD_CLOUDFORMATION_EXECUTION_ROLE}

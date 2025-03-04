@@ -1,0 +1,23 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "tickets-meli"
+region = "us-east-1"
+resolve_s3 = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+  "AppName=tickets-meli",
+  "AppEnv=dev",
+]
+
+[default.validate.parameters]
+lint = true
+
+[dev.global.parameters]
+stack_name = "tickets-meli"
+parameter_overrides = [
+  "AppName=tickets-meli",
+  "AppEnv=dev",
+  "JwtSecret=f7d8563b1e9a2c4d5e6f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6g7h8i9j0"
+]
