@@ -431,8 +431,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub ${AppName}-lmb-authorizer-${AppEnv}
-      CodeUri: ./functions/authorizer/
-      Handler: index.handler
+      CodeUri: authorizer.Dockerfile
+      Handler: ./
       Runtime: nodejs18.x
       Timeout: 10
       MemorySize: 128
