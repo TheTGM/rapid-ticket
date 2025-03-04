@@ -324,9 +324,18 @@ Resources:
         FunctionsShowApi:
           Type: Api
           Properties:
-            Path: /v1/functions-show/{proxy+}
+            Path: /v1/functions-show/public/{proxy+}
             Method: ANY
             RestApiId: !Ref BackendApiGateway
+            Authorizer: TokenAuthorizer
+        FunctionsShowOptionsMethod:
+          Type: Api
+          Properties:
+            Path: /v1/functions-show/public/{proxy+}
+            Method: OPTIONS
+            RestApiId: !Ref BackendApiGateway
+            Auth:
+              Authorizer: NONE
 
   ReservationLambda:
     Type: AWS::Serverless::Function
@@ -357,9 +366,19 @@ Resources:
         ReservationApi:
           Type: Api
           Properties:
-            Path: /v1/reservations/{proxy+}
+            Path: /v1/reservations/public/{proxy+}
             Method: ANY
             RestApiId: !Ref BackendApiGateway
+            Auth: 
+              Authorizer: TokenAuthorizer
+        ReservationApiMethod:
+          Type: Api
+          Properties:
+            Path: /v1/reservations/public/{proxy+}
+            Method: OPTIONS
+            RestApiId: !Ref BackendApiGateway
+            Auth: 
+              Authorizer: NONE
 
   ReservationProcessLambda:
     Type: AWS::Serverless::Function
@@ -422,6 +441,14 @@ Resources:
           Properties:
             Path: /v1/shows/public/{proxy+}
             Method: ANY
+            RestApiId: !Ref BackendApiGateway
+            Auth: 
+              Authorizer: TokenAuthorizer
+        ShowsOptionsApiMethod:
+          Type: Api
+          Properties:
+            Path: /v1/shows/public/{proxy+}
+            Method: OPTIONS
             RestApiId: !Ref BackendApiGateway
             Auth: 
               Authorizer: NONE
