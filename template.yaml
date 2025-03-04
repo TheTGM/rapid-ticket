@@ -36,10 +36,6 @@ Parameters:
     Type: String
     Default: appdb
     Description: Nombre de la base de datos
-    
-  TicketSecretManager:
-    Type: String
-    Description: ARN del Secret Manager para credenciales
 
 Resources:
   # VPC y Subredes
@@ -324,9 +320,6 @@ Resources:
           DB_NAME: !Ref DatabaseName
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
-      Policies:
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref TicketSecretManager
       Events:
         FunctionsShowApi:
           Type: Api
@@ -360,9 +353,6 @@ Resources:
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
           QUEUE_URL: !Ref ReservationQueue
-      Policies:
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref TicketSecretManager
       Events:
         ReservationApi:
           Type: Api
@@ -395,9 +385,6 @@ Resources:
           DB_NAME: !Ref DatabaseName
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
-      Policies:
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref TicketSecretManager
       Events:
         SQSEvent:
           Type: SQS
@@ -429,9 +416,6 @@ Resources:
           DB_NAME: !Ref DatabaseName
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
-      Policies:
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref TicketSecretManager
       Events:
         ShowsPublicApi:
           Type: Api
