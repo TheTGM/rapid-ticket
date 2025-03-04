@@ -10,7 +10,6 @@ on:
     branches:
       - 'feature/**'
 
-# Añadir permisos para OIDC si vas a usar roles
 permissions:
   id-token: write
   contents: read
@@ -64,20 +63,12 @@ jobs:
         with:
           use-installer: true
 
-      # Opción 1: Credenciales directas (usa esta opción si la otra no funciona)
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
-
-      # Opción 2: Usar OIDC para asumir rol (comenta esta sección si usas la Opción 1)
-      # - name: Configurar credenciales AWS con OIDC
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
-      #     aws-region: ${{ env.DEV_REGION }}
           
       - name: Eliminar stack de feature branch
         env:
@@ -100,20 +91,12 @@ jobs:
       - name: Construir aplicación
         run: sam build --template ${SAM_TEMPLATE} --use-container
 
-      # Opción 1: Credenciales directas (usa esta opción si la otra no funciona)
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
-
-      # Opción 2: Usar OIDC para asumir rol (comenta esta sección si usas la Opción 1)
-      # - name: Configurar credenciales AWS con OIDC
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
-      #     aws-region: ${{ env.DEV_REGION }}
           
       - name: Desplegar feature branch en entorno dev
         shell: bash
@@ -145,7 +128,6 @@ jobs:
       - name: Construir recursos
         run: sam build --template ${SAM_TEMPLATE} --use-container
         
-      # Opción 1: Credenciales directas para DEV
       - name: Configurar credenciales AWS para DEV
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -153,12 +135,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
           
+      - name: Verificar acceso a S3 (DEV)
+        run: |
+          echo "Verificando acceso al bucket S3: ${DEV_ARTIFACTS_BUCKET}"
+          aws s3 ls s3://${DEV_ARTIFACTS_BUCKET} || echo "No se pudo acceder al bucket, verifica permisos"
+          
+      - name: Verificar acceso a ECR (DEV)
+        run: |
+          echo "Verificando acceso al repositorio ECR: ${DEV_IMAGE_REPOSITORY}"
+          aws ecr describe-repositories --repository-names ${DEV_IMAGE_REPOSITORY##*/} || echo "No se pudo acceder al repositorio, verifica permisos o si existe"
+          
       - name: Empaquetar artefactos para dev
         run: |
+          echo "Empaquetando para DEV con bucket: ${DEV_ARTIFACTS_BUCKET} y repositorio: ${DEV_IMAGE_REPOSITORY}"
           sam package \
             --s3-bucket ${DEV_ARTIFACTS_BUCKET} \
             --image-repository ${DEV_IMAGE_REPOSITORY} \
             --region ${DEV_REGION} \
+            --debug \
             --output-template-file packaged-dev.yaml
             
       - uses: actions/upload-artifact@v4
@@ -166,7 +160,6 @@ jobs:
           name: packaged-dev.yaml
           path: packaged-dev.yaml
           
-      # Opción 1: Credenciales directas para STAGING
       - name: Configurar credenciales AWS para STAGING
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -174,12 +167,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.STAGING_REGION }}
           
+      - name: Verificar acceso a S3 (STAGING)
+        run: |
+          echo "Verificando acceso al bucket S3: ${STAGING_ARTIFACTS_BUCKET}"
+          aws s3 ls s3://${STAGING_ARTIFACTS_BUCKET} || echo "No se pudo acceder al bucket, verifica permisos"
+          
+      - name: Verificar acceso a ECR (STAGING)
+        run: |
+          echo "Verificando acceso al repositorio ECR: ${STAGING_IMAGE_REPOSITORY}"
+          aws ecr describe-repositories --repository-names ${STAGING_IMAGE_REPOSITORY##*/} || echo "No se pudo acceder al repositorio, verifica permisos o si existe"
+          
       - name: Empaquetar artefactos para staging
         run: |
+          echo "Empaquetando para STAGING con bucket: ${STAGING_ARTIFACTS_BUCKET} y repositorio: ${STAGING_IMAGE_REPOSITORY}"
           sam package \
             --s3-bucket ${STAGING_ARTIFACTS_BUCKET} \
             --image-repository ${STAGING_IMAGE_REPOSITORY} \
             --region ${STAGING_REGION} \
+            --debug \
             --output-template-file packaged-staging.yaml
             
       - uses: actions/upload-artifact@v4
@@ -201,7 +206,6 @@ jobs:
         with:
           name: packaged-dev.yaml
           
-      # Opción 1: Credenciales directas para DEV
       - name: Configurar credenciales AWS para DEV
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -242,7 +246,6 @@ jobs:
         with:
           name: packaged-staging.yaml
           
-      # Opción 1: Credenciales directas para STAGING
       - name: Configurar credenciales AWS para STAGING
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -280,21 +283,40 @@ jobs:
       - name: Construir recursos
         run: sam build --template ${SAM_TEMPLATE} --use-container
         
-      # Opción 1: Credenciales directas para PROD
       - name: Configurar credenciales AWS para PROD
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.PROD_REGION }}
+      
+      - name: Mostrar valores de variables (sin credenciales)
+        run: |
+          echo "PROD_ARTIFACTS_BUCKET: ${PROD_ARTIFACTS_BUCKET}"
+          echo "PROD_IMAGE_REPOSITORY: ${PROD_IMAGE_REPOSITORY}"
+          echo "PROD_REGION: ${PROD_REGION}"
+      
+      - name: Verificar acceso a S3 (PROD)
+        run: |
+          echo "Verificando acceso al bucket S3: ${PROD_ARTIFACTS_BUCKET}"
+          aws s3 ls s3://${PROD_ARTIFACTS_BUCKET} || { echo "❌ No se pudo acceder al bucket, verifica permisos"; exit 1; }
+          
+      - name: Verificar acceso a ECR (PROD)
+        run: |
+          echo "Verificando acceso al repositorio ECR: ${PROD_IMAGE_REPOSITORY}"
+          REPO_NAME=$(echo ${PROD_IMAGE_REPOSITORY} | awk -F '/' '{print $NF}')
+          echo "Nombre del repositorio extraído: ${REPO_NAME}"
+          aws ecr describe-repositories --repository-names ${REPO_NAME} || { echo "❌ No se pudo acceder al repositorio, verifica permisos o si existe"; exit 1; }
           
       - name: Empaquetar artefactos para prod
         run: |
+          echo "Empaquetando para PROD con bucket: ${PROD_ARTIFACTS_BUCKET} y repositorio: ${PROD_IMAGE_REPOSITORY}"
           sam package \
             --s3-bucket ${PROD_ARTIFACTS_BUCKET} \
             --image-repository ${PROD_IMAGE_REPOSITORY} \
             --region ${PROD_REGION} \
-            --output-template-file packaged-prod.yaml
+            --debug \
+            --output-template-file packaged-prod.yaml || { echo "❌ Error en sam package"; cat /tmp/samcli.log; exit 1; }
             
       - uses: actions/upload-artifact@v4
         with:
@@ -316,7 +338,6 @@ jobs:
         with:
           name: packaged-prod.yaml
           
-      # Opción 1: Credenciales directas para PROD
       - name: Configurar credenciales AWS para PROD
         uses: aws-actions/configure-aws-credentials@v4
         with:
