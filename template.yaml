@@ -225,7 +225,7 @@ Resources:
       DBInstanceClass: db.t3.micro
       DBName: !Ref DatabaseName
       Engine: postgres
-      EngineVersion: 16.1
+      EngineVersion: 16.3
       MasterUsername: !Ref DatabaseUsername
       MasterUserPassword: !Ref DatabasePassword
       DBSubnetGroupName: !Ref DBSubnetGroup
