@@ -350,7 +350,8 @@ Resources:
             Path: /v1/functions-show/public/{proxy+}
             Method: ANY
             RestApiId: !Ref BackendApiGateway
-            Authorizer: TokenAuthorizer
+            Auth:
+              Authorizer: TokenAuthorizer
         FunctionsShowOptionsMethod:
           Type: Api
           Properties:
@@ -393,7 +394,7 @@ Resources:
             Method: ANY
             RestApiId: !Ref BackendApiGateway
             Auth: 
-              Authorizer: TokenAuthorizer
+              Authorizer: !Ref TokenAuthorizer
         ReservationApiMethod:
           Type: Api
           Properties:
