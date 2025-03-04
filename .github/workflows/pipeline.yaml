@@ -17,10 +17,10 @@ env:
   
   # Configuración para entorno DEV
   DEV_STACK_NAME: app-reservas-dev
-  DEV_PIPELINE_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-dev-pipeline-role
-  DEV_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-dev-cloudformation-role
-  DEV_ARTIFACTS_BUCKET: aws-sam-cli-managed-dev-pipeline-artifactsbucket
-  DEV_IMAGE_REPOSITORY: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/aws-sam-cli-managed-dev-repository
+  DEV_PIPELINE_EXECUTION_ROLE: ${{ secrets.DEV_PIPELINE_EXECUTION_ROLE }}
+  DEV_CLOUDFORMATION_EXECUTION_ROLE: ${{ secrets.DEV_CLOUDFORMATION_EXECUTION_ROLE }}
+  DEV_ARTIFACTS_BUCKET: ${{ secrets.DEV_ARTIFACTS_BUCKET }}
+  DEV_IMAGE_REPOSITORY: ${{ secrets.DEV_IMAGE_REPOSITORY }}
   DEV_REGION: us-east-1
   DEV_DATABASE_USERNAME: ${{ secrets.DEV_DATABASE_USERNAME }}
   DEV_DATABASE_PASSWORD: ${{ secrets.DEV_DATABASE_PASSWORD }}
@@ -29,10 +29,10 @@ env:
 
   # Configuración para entorno STAGING
   STAGING_STACK_NAME: app-reservas-staging
-  STAGING_PIPELINE_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-staging-pipeline-role
-  STAGING_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-staging-cloudformation-role
-  STAGING_ARTIFACTS_BUCKET: aws-sam-cli-managed-staging-pipeline-artifactsbucket
-  STAGING_IMAGE_REPOSITORY: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/aws-sam-cli-managed-staging-repository
+  STAGING_PIPELINE_EXECUTION_ROLE: ${{ secrets.STAGING_PIPELINE_EXECUTION_ROLE }}
+  STAGING_CLOUDFORMATION_EXECUTION_ROLE: ${{ secrets.STAGING_CLOUDFORMATION_EXECUTION_ROLE }}
+  STAGING_ARTIFACTS_BUCKET: ${{ secrets.STAGING_ARTIFACTS_BUCKET }}
+  STAGING_IMAGE_REPOSITORY: ${{ secrets.STAGING_IMAGE_REPOSITORY }}
   STAGING_REGION: us-east-1
   STAGING_DATABASE_USERNAME: ${{ secrets.STAGING_DATABASE_USERNAME }}
   STAGING_DATABASE_PASSWORD: ${{ secrets.STAGING_DATABASE_PASSWORD }}
@@ -41,10 +41,10 @@ env:
 
   # Configuración para entorno PROD
   PROD_STACK_NAME: app-reservas-prod
-  PROD_PIPELINE_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-prod-pipeline-role
-  PROD_CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::ACCOUNT_ID:role/aws-sam-cli-managed-prod-cloudformation-role
-  PROD_ARTIFACTS_BUCKET: aws-sam-cli-managed-prod-pipeline-artifactsbucket
-  PROD_IMAGE_REPOSITORY: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/aws-sam-cli-managed-prod-repository
+  PROD_PIPELINE_EXECUTION_ROLE: ${{ secrets.PROD_PIPELINE_EXECUTION_ROLE }}
+  PROD_CLOUDFORMATION_EXECUTION_ROLE: ${{ secrets.PROD_CLOUDFORMATION_EXECUTION_ROLE }}
+  PROD_ARTIFACTS_BUCKET: ${{ secrets.PROD_ARTIFACTS_BUCKET }}
+  PROD_IMAGE_REPOSITORY: ${{ secrets.PROD_IMAGE_REPOSITORY }}
   PROD_REGION: us-east-1
   PROD_DATABASE_USERNAME: ${{ secrets.PROD_DATABASE_USERNAME }}
   PROD_DATABASE_PASSWORD: ${{ secrets.PROD_DATABASE_PASSWORD }}
