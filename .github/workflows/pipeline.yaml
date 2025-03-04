@@ -10,9 +10,12 @@ on:
     branches:
       - 'feature/**'
 
+# Añadir permisos para OIDC si vas a usar roles
+permissions:
+  id-token: write
+  contents: read
+
 env:
-  PIPELINE_USER_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  PIPELINE_USER_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   SAM_TEMPLATE: template.yaml
   
   # Configuración para entorno DEV
@@ -61,16 +64,20 @@ jobs:
         with:
           use-installer: true
 
-      - name: Asumir rol de pipeline en dev
+      # Opción 1: Credenciales directas (usa esta opción si la otra no funciona)
+      - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
-          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: feature-deletion
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
+
+      # Opción 2: Usar OIDC para asumir rol (comenta esta sección si usas la Opción 1)
+      # - name: Configurar credenciales AWS con OIDC
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
+      #     aws-region: ${{ env.DEV_REGION }}
           
       - name: Eliminar stack de feature branch
         env:
@@ -93,16 +100,20 @@ jobs:
       - name: Construir aplicación
         run: sam build --template ${SAM_TEMPLATE} --use-container
 
-      - name: Asumir rol de pipeline en dev
+      # Opción 1: Credenciales directas (usa esta opción si la otra no funciona)
+      - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
-          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: feature-deployment
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
+
+      # Opción 2: Usar OIDC para asumir rol (comenta esta sección si usas la Opción 1)
+      # - name: Configurar credenciales AWS con OIDC
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
+      #     aws-region: ${{ env.DEV_REGION }}
           
       - name: Desplegar feature branch en entorno dev
         shell: bash
@@ -134,16 +145,13 @@ jobs:
       - name: Construir recursos
         run: sam build --template ${SAM_TEMPLATE} --use-container
         
-      - name: Asumir rol de pipeline en dev
+      # Opción 1: Credenciales directas para DEV
+      - name: Configurar credenciales AWS para DEV
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
-          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: dev-packaging
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
           
       - name: Empaquetar artefactos para dev
         run: |
@@ -158,16 +166,13 @@ jobs:
           name: packaged-dev.yaml
           path: packaged-dev.yaml
           
-      - name: Asumir rol de pipeline en staging
+      # Opción 1: Credenciales directas para STAGING
+      - name: Configurar credenciales AWS para STAGING
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.STAGING_REGION }}
-          role-to-assume: ${{ env.STAGING_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: staging-packaging
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
           
       - name: Empaquetar artefactos para staging
         run: |
@@ -196,16 +201,13 @@ jobs:
         with:
           name: packaged-dev.yaml
           
-      - name: Asumir rol de pipeline en dev
+      # Opción 1: Credenciales directas para DEV
+      - name: Configurar credenciales AWS para DEV
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.DEV_REGION }}
-          role-to-assume: ${{ env.DEV_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: dev-deployment
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
           
       - name: Desplegar en entorno dev
         run: |
@@ -240,16 +242,13 @@ jobs:
         with:
           name: packaged-staging.yaml
           
-      - name: Asumir rol de pipeline en staging
+      # Opción 1: Credenciales directas para STAGING
+      - name: Configurar credenciales AWS para STAGING
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.STAGING_REGION }}
-          role-to-assume: ${{ env.STAGING_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: staging-deployment
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
           
       - name: Desplegar en entorno staging
         run: |
@@ -281,16 +280,13 @@ jobs:
       - name: Construir recursos
         run: sam build --template ${SAM_TEMPLATE} --use-container
         
-      - name: Asumir rol de pipeline en prod
+      # Opción 1: Credenciales directas para PROD
+      - name: Configurar credenciales AWS para PROD
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.PROD_REGION }}
-          role-to-assume: ${{ env.PROD_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: prod-packaging
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
           
       - name: Empaquetar artefactos para prod
         run: |
@@ -320,16 +316,13 @@ jobs:
         with:
           name: packaged-prod.yaml
           
-      - name: Asumir rol de pipeline en prod
+      # Opción 1: Credenciales directas para PROD
+      - name: Configurar credenciales AWS para PROD
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.PIPELINE_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.PIPELINE_USER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.PROD_REGION }}
-          role-to-assume: ${{ env.PROD_PIPELINE_EXECUTION_ROLE }}
-          role-session-name: prod-deployment
-          role-duration-seconds: 3600
-          role-skip-session-tagging: true
           
       - name: Desplegar en entorno producción
         run: |
