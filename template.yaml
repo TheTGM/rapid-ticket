@@ -429,11 +429,14 @@ Resources:
   # Lambda Authorizer
   TokenAuthorizerFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: authorizer.Dockerfile
+      DockerContext: ./
     Properties:
       FunctionName: !Sub ${AppName}-lmb-authorizer-${AppEnv}
-      CodeUri: authorizer.Dockerfile
-      Handler: ./
-      Runtime: nodejs18.x
+      PackageType: Image
+      Architectures:
+        - x86_64
       Timeout: 10
       MemorySize: 128
       Role: !GetAtt LambdaExecutionRole.Arn
