@@ -26,7 +26,6 @@ env:
   IMAGE_REPOSITORY: 590184057686.dkr.ecr.us-east-1.amazonaws.com/aws-sam-cli-managed-tickets-meli-pipeline-resources-imagerepository-vdb33oeux6db
   
   # Configuración para todos los entornos
-  TICKET_SECRET_MANAGER: ${{ secrets.TICKET_SECRET_MANAGER }}
   DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
   DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
 
@@ -96,7 +95,7 @@ jobs:
             --stack-name ${STACK_NAME} \
             --capabilities CAPABILITY_IAM \
             --region ${AWS_REGION} \
-            --parameter-overrides "AppName=reservas AppEnv=dev DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=${DATABASE_NAME} TicketSecretManager=${TICKET_SECRET_MANAGER}" \
+            --parameter-overrides "AppName=reservas AppEnv=dev DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=${DATABASE_NAME} " \
             --s3-bucket ${ARTIFACTS_BUCKET} \
             --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
@@ -128,7 +127,7 @@ jobs:
             --stack-name reservas-dev \
             --capabilities CAPABILITY_IAM \
             --region ${AWS_REGION} \
-            --parameter-overrides "AppName=reservas AppEnv=dev DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_dev TicketSecretManager=${TICKET_SECRET_MANAGER}" \
+            --parameter-overrides "AppName=reservas AppEnv=dev DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_dev " \
             --s3-bucket ${ARTIFACTS_BUCKET} \
             --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
@@ -161,7 +160,7 @@ jobs:
             --stack-name reservas-staging \
             --capabilities CAPABILITY_IAM \
             --region ${AWS_REGION} \
-            --parameter-overrides "AppName=reservas AppEnv=staging DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_staging TicketSecretManager=${TICKET_SECRET_MANAGER}" \
+            --parameter-overrides "AppName=reservas AppEnv=staging DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_staging " \
             --s3-bucket ${ARTIFACTS_BUCKET} \
             --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
@@ -193,7 +192,7 @@ jobs:
             --stack-name reservas-prod \
             --capabilities CAPABILITY_IAM \
             --region ${AWS_REGION} \
-            --parameter-overrides "AppName=reservas AppEnv=prod DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_prod TicketSecretManager=${TICKET_SECRET_MANAGER}" \
+            --parameter-overrides "AppName=reservas AppEnv=prod DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_prod " \
             --s3-bucket ${ARTIFACTS_BUCKET} \
             --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
