@@ -394,7 +394,7 @@ Resources:
             Method: ANY
             RestApiId: !Ref BackendApiGateway
             Auth: 
-              Authorizer: !Ref TokenAuthorizer
+              Authorizer: TokenAuthorizer
         ReservationApiMethod:
           Type: Api
           Properties:
