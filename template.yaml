@@ -516,6 +516,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
 
 
+
 Outputs:
   ApiEndpoint:
     Description: "API Gateway Endpoint URL"
