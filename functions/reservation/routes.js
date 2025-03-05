@@ -9,7 +9,7 @@ const pool = new Pool({
   port: 5432,
   database: "reservas_prod",
   user: "reservas_admin", // Asegúrate de que esta variable esté configurada
-  password: "Nacionallds123$", // Asegúrate de que esta variable esté configurada
+  password: "Reservas2025!", // Asegúrate de que esta variable esté configurada
 });
 
 // Endpoint existente
