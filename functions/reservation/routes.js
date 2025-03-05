@@ -226,6 +226,16 @@ api.post("/loadTestData", async (req, res, next) => {
       // Script para cargar datos de prueba
       const testDataScript = `
                 -- Datos de ejemplo para RapidTicket
+
+-- 1. Primero insertar Usuarios
+INSERT INTO Users (username, passwordHash, email, name, role, status)
+VALUES 
+  ('admin', '$2a$10$XUHoT1JMOjnHm6aJEJ4hDe5GF5FwfJKyOdS5Fl7gU5Ut5S.E8JPqa', 'admin@rapidticket.com', 'Administrador Sistema', 'admin', 'active'),
+  ('usuario1', '$2a$10$KlJ.VvNQUwM0dIBs7UW.2eBYfuXsZD9pNvUGn9uZJ9zWi6rOnE3V2', 'usuario1@email.com', 'Usuario Ejemplo', 'user', 'active'),
+  ('operador1', '$2a$10$MnF8oXU16WZrLbfQ3fOYa.5KlQb52R.Oob5mGAQ.UZ.MHx9W4b7ky', 'operador1@rapidticket.com', 'Operador Teatro', 'user', 'active'),
+  ('cliente1', '$2a$10$a4KlJ.y6vNQUwM0dIBs7UW.9pNvUGn9uZJ9zWi6rOnE3V2', 'cliente1@email.com', 'Cliente Regular', 'user', 'active'),
+  ('cliente2', '$2a$10$KOJ.y6vNQ7wM0dIBs7UW.2eBYfuXsG9pNvUGnuZJ7zWi6rOnE3V2', 'cliente2@email.com', 'Cliente VIP', 'user', 'active');
+
 -- 2. Insertar Shows
 INSERT INTO Shows (name, description, duration, imageUrl)
 VALUES 
@@ -672,101 +682,6 @@ api.get("/checkTableIds", async (req, res, next) => {
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       message: "Error al verificar IDs de tablas",
       error: error.message,
-    });
-  }
-});
-
-// Endpoint para inicializar la base de datos con el esquema completo
-api.post("/deleteDatabase", async (req, res, next) => {
-  try {
-    const client = await pool.connect();
-
-    try {
-      // Inicio de la transacción
-      await client.query("BEGIN");
-
-      // Script completo del esquema (igual que en el código anterior)
-      const schemaScript = `
--- Script para eliminar todos los datos de la base de datos RapidTicket
--- IMPORTANTE: Este script elimina TODOS los datos pero mantiene la estructura de tablas
-
--- Desactivar temporalmente las restricciones de clave foránea para poder eliminar datos sin problemas
-SET session_replication_role = 'replica';
-
--- Truncar todas las tablas en orden inverso (debido a las dependencias de clave foránea)
-TRUNCATE TABLE ReservationItems CASCADE;
-TRUNCATE TABLE Reservations CASCADE;
-TRUNCATE TABLE Seats CASCADE;
-TRUNCATE TABLE FunctionSections CASCADE;
-TRUNCATE TABLE FunctionsTable CASCADE;
-TRUNCATE TABLE Sections CASCADE;
-TRUNCATE TABLE Venues CASCADE;
-TRUNCATE TABLE Shows CASCADE;
-TRUNCATE TABLE Users CASCADE;
-
--- Restablecer las restricciones de clave foránea
-SET session_replication_role = 'origin';
-
--- Reiniciar las secuencias para que empiecen de nuevo en 1
-ALTER SEQUENCE users_id_seq RESTART WITH 1;
-ALTER SEQUENCE shows_id_seq RESTART WITH 1;
-ALTER SEQUENCE venues_id_seq RESTART WITH 1;
-ALTER SEQUENCE sections_id_seq RESTART WITH 1;
-ALTER SEQUENCE functions_id_seq RESTART WITH 1;
-ALTER SEQUENCE function_sections_id_seq RESTART WITH 1;
-ALTER SEQUENCE seats_id_seq RESTART WITH 1;
-ALTER SEQUENCE reservations_id_seq RESTART WITH 1;
-ALTER SEQUENCE reservation_items_id_seq RESTART WITH 1;
-
--- Verificar que todas las tablas estén vacías
-SELECT 'Users' AS tabla, COUNT(*) AS registros FROM Users
-UNION ALL
-SELECT 'Shows' AS tabla, COUNT(*) AS registros FROM Shows
-UNION ALL
-SELECT 'Venues' AS tabla, COUNT(*) AS registros FROM Venues
-UNION ALL
-SELECT 'Sections' AS tabla, COUNT(*) AS registros FROM Sections
-UNION ALL
-SELECT 'FunctionsTable' AS tabla, COUNT(*) AS registros FROM FunctionsTable
-UNION ALL
-SELECT 'FunctionSections' AS tabla, COUNT(*) AS registros FROM FunctionSections
-UNION ALL
-SELECT 'Seats' AS tabla, COUNT(*) AS registros FROM Seats
-UNION ALL
-SELECT 'Reservations' AS tabla, COUNT(*) AS registros FROM Reservations
-UNION ALL
-SELECT 'ReservationItems' AS tabla, COUNT(*) AS registros FROM ReservationItems;
-            `;
-
-      // Ejecutar el script completo
-      await client.query(schemaScript);
-
-      // Finalizar la transacción
-      await client.query("COMMIT");
-
-      return res.status(StatusCodes.OK).json({
-        message:
-          "Base de datos inicializada correctamente con el esquema completo",
-        success: true,
-      });
-    } catch (error) {
-      // Revertir la transacción en caso de error
-      await client.query("ROLLBACK");
-      console.error("Error al inicializar la base de datos:", error);
-      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-        message: "Error al inicializar la base de datos",
-        error: error.message,
-        success: false,
-      });
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error("Error de conexión:", error);
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      message: "Error de conexión a la base de datos",
-      error: error.message,
-      success: false,
     });
   }
 });
