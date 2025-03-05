@@ -33,149 +33,152 @@ api.post("/initializeDatabase", async (req, res, next) => {
 
       // Script completo del esquema (igual que en el código anterior)
       const schemaScript = `
-                -- Primero, crear los tipos ENUM
-                CREATE TYPE IF NOT EXISTS user_role AS ENUM ('admin', 'user');
-                CREATE TYPE IF NOT EXISTS user_status AS ENUM ('active', 'inactive', 'suspended');
-                CREATE TYPE IF NOT EXISTS function_status AS ENUM ('scheduled', 'canceled', 'completed');
-                CREATE TYPE IF NOT EXISTS seat_status AS ENUM ('available', 'reserved', 'unavailable');
-                CREATE TYPE IF NOT EXISTS reservation_status AS ENUM ('pending', 'confirmed', 'canceled', 'failed');
+      -- Esquema corregido de base de datos para RapidTicket
+-- Creando secuencias específicas para cada tabla
 
-                -- Crear secuencias específicas si no existen
-                CREATE SEQUENCE IF NOT EXISTS users_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS shows_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS venues_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS sections_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS functions_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS function_sections_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS seats_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS reservations_id_seq START WITH 1;
-                CREATE SEQUENCE IF NOT EXISTS reservation_items_id_seq START WITH 1;
+-- Primero, crear los tipos ENUM
+CREATE TYPE user_role AS ENUM ('admin', 'user');
+CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended');
+CREATE TYPE function_status AS ENUM ('scheduled', 'canceled', 'completed');
+CREATE TYPE seat_status AS ENUM ('available', 'reserved', 'unavailable');
+CREATE TYPE reservation_status AS ENUM ('pending', 'confirmed', 'canceled', 'failed');
 
-                -- Tabla Users con secuencia específica
-                CREATE TABLE IF NOT EXISTS Users (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('users_id_seq'),
-                  username VARCHAR(50) NOT NULL UNIQUE,
-                  passwordHash VARCHAR(255) NOT NULL,
-                  email VARCHAR(100) NOT NULL UNIQUE,
-                  name VARCHAR(100) NOT NULL,
-                  role user_role NOT NULL DEFAULT 'user',
-                  status user_status NOT NULL DEFAULT 'active',
-                  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
+-- Crear secuencias específicas
+CREATE SEQUENCE users_id_seq START WITH 1;
+CREATE SEQUENCE shows_id_seq START WITH 1;
+CREATE SEQUENCE venues_id_seq START WITH 1;
+CREATE SEQUENCE sections_id_seq START WITH 1;
+CREATE SEQUENCE functions_id_seq START WITH 1;
+CREATE SEQUENCE function_sections_id_seq START WITH 1;
+CREATE SEQUENCE seats_id_seq START WITH 1;
+CREATE SEQUENCE reservations_id_seq START WITH 1;
+CREATE SEQUENCE reservation_items_id_seq START WITH 1;
 
-                -- Tabla Shows con secuencia específica
-                CREATE TABLE IF NOT EXISTS Shows (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('shows_id_seq'),
-                  name VARCHAR(100) NOT NULL,
-                  description TEXT,
-                  duration INT, -- duración en minutos
-                  imageUrl VARCHAR(255),
-                  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
+-- Tabla Users con secuencia específica
+CREATE TABLE Users (
+  id INTEGER PRIMARY KEY DEFAULT nextval('users_id_seq'),
+  username VARCHAR(50) NOT NULL UNIQUE,
+  passwordHash VARCHAR(255) NOT NULL,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL,
+  role user_role NOT NULL DEFAULT 'user',
+  status user_status NOT NULL DEFAULT 'active',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-                -- Lugares con secuencia específica
-                CREATE TABLE IF NOT EXISTS Venues (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('venues_id_seq'),
-                  name VARCHAR(100) NOT NULL,
-                  address VARCHAR(255) NOT NULL,
-                  city VARCHAR(50) NOT NULL,
-                  state VARCHAR(50),
-                  country VARCHAR(50) NOT NULL DEFAULT 'Argentina',
-                  capacity INT,
-                  description TEXT,
-                  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
+-- Tabla Shows con secuencia específica
+CREATE TABLE Shows (
+  id INTEGER PRIMARY KEY DEFAULT nextval('shows_id_seq'),
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  duration INT, -- duración en minutos
+  imageUrl VARCHAR(255),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-                -- Secciones de lugares con secuencia específica
-                CREATE TABLE IF NOT EXISTS Sections (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('sections_id_seq'),
-                  venueId INT NOT NULL,
-                  name VARCHAR(50) NOT NULL,
-                  description TEXT,
-                  capacity INT,
-                  hasNumberedSeats BOOLEAN NOT NULL DEFAULT false,
-                  FOREIGN KEY (venueId) REFERENCES Venues(id),
-                  CONSTRAINT unique_venue_section UNIQUE (venueId, name)
-                );
+-- Lugares con secuencia específica
+CREATE TABLE Venues (
+  id INTEGER PRIMARY KEY DEFAULT nextval('venues_id_seq'),
+  name VARCHAR(100) NOT NULL,
+  address VARCHAR(255) NOT NULL,
+  city VARCHAR(50) NOT NULL,
+  state VARCHAR(50),
+  country VARCHAR(50) NOT NULL DEFAULT 'Argentina',
+  capacity INT,
+  description TEXT,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-                -- Funciones (instancias de shows en lugares) con secuencia específica
-                CREATE TABLE IF NOT EXISTS FunctionsTable (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('functions_id_seq'),
-                  showId INT NOT NULL,
-                  venueId INT NOT NULL,
-                  functionDate DATE NOT NULL,
-                  functionTime TIME NOT NULL,
-                  status function_status NOT NULL DEFAULT 'scheduled',
-                  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  FOREIGN KEY (showId) REFERENCES Shows(id),
-                  FOREIGN KEY (venueId) REFERENCES Venues(id),
-                  CONSTRAINT unique_show_venue_datetime UNIQUE (showId, venueId, functionDate, functionTime)
-                );
+-- Secciones de lugares con secuencia específica
+CREATE TABLE Sections (
+  id INTEGER PRIMARY KEY DEFAULT nextval('sections_id_seq'),
+  venueId INT NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  description TEXT,
+  capacity INT,
+  hasNumberedSeats BOOLEAN NOT NULL DEFAULT false,
+  FOREIGN KEY (venueId) REFERENCES Venues(id),
+  CONSTRAINT unique_venue_section UNIQUE (venueId, name)
+);
 
-                -- Crear índices para la tabla FunctionsTable
-                CREATE INDEX IF NOT EXISTS idx_show_idx ON FunctionsTable (showId);
-                CREATE INDEX IF NOT EXISTS idx_venue_idx ON FunctionsTable (venueId);
-                CREATE INDEX IF NOT EXISTS idx_date_idx ON FunctionsTable (functionDate);
-                CREATE INDEX IF NOT EXISTS idx_status_idx ON FunctionsTable (status);
-                CREATE INDEX IF NOT EXISTS idx_show_date_idx ON FunctionsTable (showId, functionDate);
+-- Funciones (instancias de shows en lugares) con secuencia específica
+CREATE TABLE FunctionsTable (
+  id INTEGER PRIMARY KEY DEFAULT nextval('functions_id_seq'),
+  showId INT NOT NULL,
+  venueId INT NOT NULL,
+  functionDate DATE NOT NULL,
+  functionTime TIME NOT NULL,
+  status function_status NOT NULL DEFAULT 'scheduled',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (showId) REFERENCES Shows(id),
+  FOREIGN KEY (venueId) REFERENCES Venues(id),
+  CONSTRAINT unique_show_venue_datetime UNIQUE (showId, venueId, functionDate, functionTime)
+);
 
-                -- Secciones por función (con precios) con secuencia específica
-                CREATE TABLE IF NOT EXISTS FunctionSections (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('function_sections_id_seq'),
-                  functionId INT NOT NULL,
-                  sectionId INT NOT NULL,
-                  price DECIMAL(10, 2) NOT NULL,
-                  availableSeats INT,
-                  FOREIGN KEY (functionId) REFERENCES FunctionsTable(id),
-                  FOREIGN KEY (sectionId) REFERENCES Sections(id),
-                  CONSTRAINT unique_function_section UNIQUE (functionId, sectionId)
-                );
+-- Crear índices para la tabla FunctionsTable
+CREATE INDEX idx_show_idx ON FunctionsTable (showId);
+CREATE INDEX idx_venue_idx ON FunctionsTable (venueId);
+CREATE INDEX idx_date_idx ON FunctionsTable (functionDate);
+CREATE INDEX idx_status_idx ON FunctionsTable (status);
+CREATE INDEX idx_show_date_idx ON FunctionsTable (showId, functionDate);
 
-                -- Butacas con secuencia específica
-                CREATE TABLE IF NOT EXISTS Seats (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('seats_id_seq'),
-                  sectionId INT NOT NULL,
-                  row VARCHAR(10),
-                  number VARCHAR(10),
-                  status seat_status NOT NULL DEFAULT 'available',
-                  FOREIGN KEY (sectionId) REFERENCES Sections(id),
-                  CONSTRAINT unique_seat UNIQUE (sectionId, row, number)
-                );
+-- Secciones por función (con precios) con secuencia específica
+CREATE TABLE FunctionSections (
+  id INTEGER PRIMARY KEY DEFAULT nextval('function_sections_id_seq'),
+  functionId INT NOT NULL,
+  sectionId INT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  availableSeats INT,
+  FOREIGN KEY (functionId) REFERENCES FunctionsTable(id),
+  FOREIGN KEY (sectionId) REFERENCES Sections(id),
+  CONSTRAINT unique_function_section UNIQUE (functionId, sectionId)
+);
 
-                -- Reservas con secuencia específica
-                CREATE TABLE IF NOT EXISTS Reservations (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('reservations_id_seq'),
-                  userId INT,
-                  customerName VARCHAR(100) NOT NULL,
-                  customerDni VARCHAR(20) NOT NULL,
-                  contactEmail VARCHAR(100) NOT NULL,
-                  totalAmount DECIMAL(10, 2),
-                  status reservation_status NOT NULL DEFAULT 'pending',
-                  updateReason VARCHAR(255),
-                  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  FOREIGN KEY (userId) REFERENCES Users(id)
-                );
+-- Butacas con secuencia específica
+CREATE TABLE Seats (
+  id INTEGER PRIMARY KEY DEFAULT nextval('seats_id_seq'),
+  sectionId INT NOT NULL,
+  row VARCHAR(10),
+  number VARCHAR(10),
+  status seat_status NOT NULL DEFAULT 'available',
+  FOREIGN KEY (sectionId) REFERENCES Sections(id),
+  CONSTRAINT unique_seat UNIQUE (sectionId, row, number)
+);
 
-                -- Items de reserva con secuencia específica
-                CREATE TABLE IF NOT EXISTS ReservationItems (
-                  id INTEGER PRIMARY KEY DEFAULT nextval('reservation_items_id_seq'),
-                  reservationId INT NOT NULL,
-                  functionId INT NOT NULL,
-                  seatId INT NOT NULL,
-                  price DECIMAL(10, 2) NOT NULL,
-                  status reservation_status NOT NULL DEFAULT 'pending',
-                  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  FOREIGN KEY (reservationId) REFERENCES Reservations(id),
-                  FOREIGN KEY (functionId) REFERENCES FunctionsTable(id),
-                  FOREIGN KEY (seatId) REFERENCES Seats(id),
-                  CONSTRAINT unique_reservation_seat UNIQUE (reservationId, seatId)
-                );
+-- Reservas con secuencia específica
+CREATE TABLE Reservations (
+  id INTEGER PRIMARY KEY DEFAULT nextval('reservations_id_seq'),
+  userId INT,
+  customerName VARCHAR(100) NOT NULL,
+  customerDni VARCHAR(20) NOT NULL,
+  contactEmail VARCHAR(100) NOT NULL,
+  totalAmount DECIMAL(10, 2),
+  status reservation_status NOT NULL DEFAULT 'pending',
+  updateReason VARCHAR(255),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES Users(id)
+);
+
+-- Items de reserva con secuencia específica
+CREATE TABLE ReservationItems (
+  id INTEGER PRIMARY KEY DEFAULT nextval('reservation_items_id_seq'),
+  reservationId INT NOT NULL,
+  functionId INT NOT NULL,
+  seatId INT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  status reservation_status NOT NULL DEFAULT 'pending',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (reservationId) REFERENCES Reservations(id),
+  FOREIGN KEY (functionId) REFERENCES FunctionsTable(id),
+  FOREIGN KEY (seatId) REFERENCES Seats(id),
+  CONSTRAINT unique_reservation_seat UNIQUE (reservationId, seatId)
+);
             `;
 
       // Ejecutar el script completo
