@@ -5,9 +5,9 @@ const api = express.Router();
 
 // Configuración de la conexión a PostgreSQL
 const pool = new Pool({
-  host: "reservas-prod-rdsinstance-ujrhyb8iq5p1.cvu40ei68oeo.us-east-1.rds.amazonaws.com",
-  port: 5432,
-  database: "reservas_prod",
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
   user: "reservas_admin", // Asegúrate de que esta variable esté configurada
   password: "Reservas2025!", // Asegúrate de que esta variable esté configurada
 });
