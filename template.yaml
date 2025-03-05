@@ -197,10 +197,6 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           SourceSecurityGroupId: !Ref LambdaSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          CidrIp: 0.0.0.0/0
 
   ElastiCacheSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -219,8 +215,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: Grupo de subredes para RDS
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
 
   RDSInstance:
     Type: AWS::RDS::DBInstance
@@ -238,7 +234,7 @@ Resources:
       MultiAZ: false
       StorageType: gp2
       BackupRetentionPeriod: 7
-      PubliclyAccessible: true
+      PubliclyAccessible: false
       DeletionProtection: true
 
   # ElastiCache (Redis)
@@ -518,6 +514,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
+
 
 Outputs:
   ApiEndpoint:
