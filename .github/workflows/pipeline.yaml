@@ -19,15 +19,16 @@ env:
   AWS_REGION: us-east-1
   
   # SAM CLI configuración
-  PIPELINE_USER: arn:aws:iam::590184057686:user/aws-sam-cli-managed-tickets-meli-pipel-PipelineUser-9rkg145QXMA0
-  PIPELINE_EXECUTION_ROLE: arn:aws:iam::590184057686:role/aws-sam-cli-managed-tickets-m-PipelineExecutionRole-PPr1VqA21kkt
-  CLOUDFORMATION_EXECUTION_ROLE: arn:aws:iam::590184057686:role/aws-sam-cli-managed-ticke-CloudFormationExecutionRo-xn4QpQMTrkJD
-  ARTIFACTS_BUCKET: aws-sam-cli-managed-tickets-meli-p-artifactsbucket-yu0wicf9ro9u
-  IMAGE_REPOSITORY: 590184057686.dkr.ecr.us-east-1.amazonaws.com/aws-sam-cli-managed-tickets-meli-pipeline-resources-imagerepository-vdb33oeux6db
+  PIPELINE_USER: ${{ secrets.PIPELINE_USER }}
+  PIPELINE_EXECUTION_ROLE: ${{ secrets.PIPELINE_EXECUTION_ROLE }}
+  CLOUDFORMATION_EXECUTION_ROLE: ${{ secrets.CLOUDFORMATION_EXECUTION_ROLE }}
+  ARTIFACTS_BUCKET: ${{ secrets.ARTIFACTS_BUCKET }}
+  IMAGE_REPOSITORY: ${{ secrets.IMAGE_REPOSITORY }}
   
   # Configuración para todos los entornos
   DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
   DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+  DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
 
 jobs:
   delete-feature:
@@ -192,7 +193,7 @@ jobs:
             --stack-name reservas-prod \
             --capabilities CAPABILITY_IAM \
             --region ${AWS_REGION} \
-            --parameter-overrides "AppName=reservas AppEnv=prod DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=reservas_prod " \
+            --parameter-overrides "AppName=reservas AppEnv=prod DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=${DATABASE_NAME} " \
             --s3-bucket ${ARTIFACTS_BUCKET} \
             --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
