@@ -32,7 +32,7 @@ api.post("/login", async (req, res, next) => {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        'SELECT id, username, "passwordHash", email, name, role, status FROM Users WHERE username = $1',
+        'SELECT id, username, passwordHash, email, name, role, status FROM Users WHERE username = $1',
         [username]
       );
 
@@ -84,7 +84,7 @@ api.post("/login", async (req, res, next) => {
 
 api.post("/registerTest", async (req, res, next) => {
   const testUser = {
-    username: "admin",
+    username: "admin123",
     password: "Admin123!", // En producción, usar una contraseña más segura
     email: "admin@example.com",
     name: "Admin User",
@@ -105,7 +105,7 @@ api.post("/registerTest", async (req, res, next) => {
         return;
       }
       await client.query(
-        'INSERT INTO Users (username, "passwordHash", email, name, role, status) VALUES ($1, $2, $3, $4, $5, $6)',
+        'INSERT INTO Users (username, passwordHash, email, name, role, status) VALUES ($1, $2, $3, $4, $5, $6)',
         [
           testUser.username,
           passwordHash,
