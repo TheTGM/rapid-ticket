@@ -56,6 +56,8 @@ api.post("/login", async (req, res, next) => {
         return res.status(401).json({ message: "Credenciales inválidas" });
       }
 
+      console.log("passwordMatch: ", passwordMatch);
+
       const token = jwt.sign(
         {
           id: user.id,
@@ -69,6 +71,10 @@ api.post("/login", async (req, res, next) => {
           expiresIn: TOKEN_EXPIRY,
         }
       );
+
+      console.log("token: ", token);
+      console.log("JWT_SECRET: ", JWT_SECRET);
+      console.log("expiresIn: ", TOKEN_EXPIRY);
 
       return res.status(200).json({ token });
     } catch (error) {
