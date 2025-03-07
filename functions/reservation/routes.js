@@ -28,7 +28,7 @@ api.post("/testBd", async (req, res, next) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query("SELECT * FROM shows");
+      const result = await client.query("SELECT * FROM Shows");
       console.log(result.rows);
       return res.status(StatusCodes.OK).json({ message: "ok", result:result.rows });  
     } finally {
