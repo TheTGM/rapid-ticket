@@ -51,7 +51,7 @@ api.post("/login", async (req, res, next) => {
         };
       }
 
-      const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+      const passwordMatch = await bcrypt.compare(password, user.passwordhash);
       if (!passwordMatch) {
         return res.status(401).json({ message: "Credenciales inválidas" });
       }
