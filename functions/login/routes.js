@@ -19,20 +19,24 @@ api.post("/login", async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
+    // Validar credenciales - CORREGIDO: Usar res.status().json() para enviar la respuesta
     if (!username || !password) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          message: "Usuario y contraseña son requeridos",
-        }),
-      };
+      return res.status(400).json({
+        message: "Usuario y contraseña son requeridos",
+      });
     }
 
     const client = await pool.connect();
     try {
+      // Opción 1: Con comillas dobles para respetar mayúsculas
+      // const result = await client.query(
+      //   'SELECT id, username, "passwordHash", email, name, role, status FROM "Users" WHERE username = $1',
+      //   [username]
+      // );
+
+      // Opción 2: Sin comillas, PostgreSQL convierte a minúsculas
       const result = await client.query(
-        'SELECT id, username, passwordHash, email, name, role, status FROM Users WHERE username = $1',
+        "SELECT id, username, passwordhash, email, name, role, status FROM users WHERE username = $1",
         [username]
       );
 
@@ -43,14 +47,25 @@ api.post("/login", async (req, res, next) => {
       const user = result.rows[0];
       console.log("user: ", user);
 
+      // CORREGIDO: Usar res.status().json() para enviar la respuesta
       if (user.status !== "active") {
-        return {
-          statusCode: 403,
-          headers,
-          body: JSON.stringify({ message: "Cuenta inactiva o suspendida" }),
-        };
+        return res.status(403).json({
+          message: "Cuenta inactiva o suspendida",
+        });
       }
 
+      // Importante: Asegurarnos que passwordhash existe
+      if (!user.passwordhash) {
+        console.error(
+          "Error: passwordhash es undefined para el usuario:",
+          username
+        );
+        return res.status(500).json({
+          message: "Error en la autenticación. Contacte al administrador.",
+        });
+      }
+
+      // La propiedad correcta es 'passwordhash' (todo en minúsculas)
       const passwordMatch = await bcrypt.compare(password, user.passwordhash);
       if (!passwordMatch) {
         return res.status(401).json({ message: "Credenciales inválidas" });
@@ -60,7 +75,7 @@ api.post("/login", async (req, res, next) => {
 
       const token = jwt.sign(
         {
-          id: user.id,
+          sub: user.id, // Estándar JWT para ID
           username: user.username,
           email: user.email,
           name: user.name,
@@ -72,20 +87,31 @@ api.post("/login", async (req, res, next) => {
         }
       );
 
-      console.log("token: ", token);
-      console.log("JWT_SECRET: ", JWT_SECRET);
-      console.log("expiresIn: ", TOKEN_EXPIRY);
-
-      return res.status(200).json({ token });
+      return res.status(200).json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+      });
     } catch (error) {
-      console.error("Error API login: ", error);
-      next(error);
+      console.error("Error en consulta de login: ", error);
+      return res.status(500).json({
+        message: "Error en el servidor",
+        error: error.message,
+      });
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error("Error API login: ", error);
-    next(error);
+    console.error("Error general en API login: ", error);
+    return res.status(500).json({
+      message: "Error interno del servidor",
+      error: error.message,
+    });
   }
 });
 
@@ -104,7 +130,7 @@ api.post("/registerTest", async (req, res, next) => {
       const passwordHash = await bcrypt.hash(testUser.password, salt);
 
       const checkResult = await client.query(
-        'SELECT id FROM Users WHERE username = $1',
+        "SELECT id FROM Users WHERE username = $1",
         [testUser.username]
       );
       if (checkResult.rows.length > 0) {
@@ -112,7 +138,7 @@ api.post("/registerTest", async (req, res, next) => {
         return;
       }
       await client.query(
-        'INSERT INTO Users (username, passwordHash, email, name, role, status) VALUES ($1, $2, $3, $4, $5, $6)',
+        "INSERT INTO Users (username, passwordHash, email, name, role, status) VALUES ($1, $2, $3, $4, $5, $6)",
         [
           testUser.username,
           passwordHash,
