@@ -82,4 +82,50 @@ api.post("/login", async (req, res, next) => {
   }
 });
 
+api.post("/registerTest", async (req, res, next) => {
+  const testUser = {
+    username: "admin",
+    password: "Admin123!", // En producción, usar una contraseña más segura
+    email: "admin@example.com",
+    name: "Admin User",
+    role: "admin",
+  };
+  try {
+    const client = await pool.connect();
+    try {
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(testUser.password, salt);
+
+      const checkResult = await client.query(
+        'SELECT id FROM "Users" WHERE username = $1',
+        [testUser.username]
+      );
+      if (checkResult.rows.length > 0) {
+        console.log(`El usuario '${testUser.username}' ya existe.`);
+        return;
+      }
+      await client.query(
+        'INSERT INTO "Users" (username, "passwordHash", email, name, role, status) VALUES ($1, $2, $3, $4, $5, $6)',
+        [
+          testUser.username,
+          passwordHash,
+          testUser.email,
+          testUser.name,
+          testUser.role,
+          "active",
+        ]
+      );
+      return res.status(200).json({ message: "ok" });
+    } catch (error) {
+      console.error("error API create payment: ", error);
+      next(error);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("error API create payment: ", error);
+    next(error);
+  }
+});
+
 module.exports = api;

@@ -514,7 +514,7 @@ Resources:
         AuthLoginApi:
           Type: Api
           Properties:
-            Path: /v1/auth/login
+            Path: /v1/auth/{proxy+}
             Method: POST
             RestApiId: !Ref BackendApiGateway
             Auth:
@@ -522,7 +522,7 @@ Resources:
         AuthLoginOptionsMethod:
           Type: Api
           Properties:
-            Path: /v1/auth/login
+            Path: /v1/auth/{proxy+}
             Method: OPTIONS
             RestApiId: !Ref BackendApiGateway
             Auth:
