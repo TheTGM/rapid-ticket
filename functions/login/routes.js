@@ -41,6 +41,7 @@ api.post("/login", async (req, res, next) => {
       }
 
       const user = result.rows[0];
+      console.log("user: ", user);
 
       if (user.status !== "active") {
         return {
