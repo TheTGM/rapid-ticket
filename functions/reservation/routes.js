@@ -24,5 +24,22 @@ api.post("/testShow", showReservationMiddleware, async (req, res, next) => {
   }
 });
 
+api.post("/testBd", async (req, res, next) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const result = await client.query("SELECT * FROM shows");
+      console.log(result.rows);
+      return res.status(StatusCodes.OK).json({ message: "ok", result:result.rows });  
+    } finally {
+      client.release();
+    }
+    return res.status(StatusCodes.OK).json({ message: "ok" });
+  } catch (error) {
+    console.error("error API create payment: ", error);
+    next(error);
+  }
+});
+
 
 module.exports = api;
