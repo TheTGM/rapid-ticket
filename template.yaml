@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Arquitectura SAM para aplicación de reservas
 
@@ -7,7 +7,12 @@ Parameters:
     Type: String
     Default: app
     Description: Nombre de la aplicación
-    
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Description: Clave secreta para firmar y verificar tokens JWT
+
   AppEnv:
     Type: String
     Default: dev
@@ -16,22 +21,22 @@ Parameters:
       - staging
       - prod
     Description: Entorno de la aplicación
-  
+
   VpcCIDR:
     Type: String
     Default: 10.0.0.0/16
     Description: CIDR para la VPC
-  
+
   DatabaseUsername:
     Type: String
     Default: admin
     Description: Nombre de usuario para la base de datos
-  
+
   DatabasePassword:
     Type: String
     NoEcho: true
     Description: Contraseña para la base de datos
-  
+
   DatabaseName:
     Type: String
     Default: appdb
@@ -54,7 +59,7 @@ Resources:
     Properties:
       VpcId: !Ref AppVPC
       CidrBlock: !Select [0, !Cidr [!Ref VpcCIDR, 6, 8]]
-      AvailabilityZone: !Select [0, !GetAZs '']
+      AvailabilityZone: !Select [0, !GetAZs ""]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -65,7 +70,7 @@ Resources:
     Properties:
       VpcId: !Ref AppVPC
       CidrBlock: !Select [1, !Cidr [!Ref VpcCIDR, 6, 8]]
-      AvailabilityZone: !Select [1, !GetAZs '']
+      AvailabilityZone: !Select [1, !GetAZs ""]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -76,7 +81,7 @@ Resources:
     Properties:
       VpcId: !Ref AppVPC
       CidrBlock: !Select [2, !Cidr [!Ref VpcCIDR, 6, 8]]
-      AvailabilityZone: !Select [0, !GetAZs '']
+      AvailabilityZone: !Select [0, !GetAZs ""]
       Tags:
         - Key: Name
           Value: app-private-subnet-1
@@ -86,7 +91,7 @@ Resources:
     Properties:
       VpcId: !Ref AppVPC
       CidrBlock: !Select [3, !Cidr [!Ref VpcCIDR, 6, 8]]
-      AvailabilityZone: !Select [1, !GetAZs '']
+      AvailabilityZone: !Select [1, !GetAZs ""]
       Tags:
         - Key: Name
           Value: app-private-subnet-2
@@ -264,14 +269,14 @@ Resources:
       FifoQueue: true
       ContentBasedDeduplication: true
       VisibilityTimeout: 300
-      MessageRetentionPeriod: 1209600  # 14 días
+      MessageRetentionPeriod: 1209600 # 14 días
 
   # IAM Roles para Lambdas
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -286,7 +291,7 @@ Resources:
     Properties:
       PolicyName: LambdaSQSPolicy
       PolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Action:
@@ -307,8 +312,8 @@ Resources:
       TracingEnabled: true
       MethodSettings:
         - LoggingLevel: INFO
-          ResourcePath: '/*'
-          HttpMethod: '*'
+          ResourcePath: "/*"
+          HttpMethod: "*"
           MetricsEnabled: true
           DataTraceEnabled: true
       Auth:
@@ -396,7 +401,7 @@ Resources:
             Path: /v1/reservations/public/{proxy+}
             Method: ANY
             RestApiId: !Ref BackendApiGateway
-            Auth: 
+            Auth:
               Authorizer: TokenAuthorizer
         ReservationApiMethod:
           Type: Api
@@ -404,7 +409,7 @@ Resources:
             Path: /v1/reservations/public/{proxy+}
             Method: OPTIONS
             RestApiId: !Ref BackendApiGateway
-            Auth: 
+            Auth:
               Authorizer: NONE
 
   ReservationProcessLambda:
@@ -469,7 +474,7 @@ Resources:
             Path: /v1/shows/public/{proxy+}
             Method: ANY
             RestApiId: !Ref BackendApiGateway
-            Auth: 
+            Auth:
               Authorizer: TokenAuthorizer
         ShowsOptionsApiMethod:
           Type: Api
@@ -477,7 +482,50 @@ Resources:
             Path: /v1/shows/public/{proxy+}
             Method: OPTIONS
             RestApiId: !Ref BackendApiGateway
-            Auth: 
+            Auth:
+              Authorizer: NONE
+
+  AuthLoginLambda:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: login.Dockerfile
+      DockerContext: ./
+    Properties:
+      FunctionName: !Sub ${AppName}-lmb-auth-login-${AppEnv}
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Role: !GetAtt LambdaExecutionRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt RDSInstance.Endpoint.Address
+          DB_PORT: !GetAtt RDSInstance.Endpoint.Port
+          DB_NAME: !Ref DatabaseName
+          DB_USERNAME: !Ref DatabaseUsername
+          DB_PASSWORD: !Ref DatabasePassword
+          JWT_SECRET: !Ref JwtSecret
+      Events:
+        AuthLoginApi:
+          Type: Api
+          Properties:
+            Path: /v1/auth/login
+            Method: POST
+            RestApiId: !Ref BackendApiGateway
+            Auth:
+              Authorizer: NONE
+        AuthLoginOptionsMethod:
+          Type: Api
+          Properties:
+            Path: /v1/auth/login
+            Method: OPTIONS
+            RestApiId: !Ref BackendApiGateway
+            Auth:
               Authorizer: NONE
 
   # Lambda Authorizer
@@ -493,6 +541,9 @@ Resources:
         - x86_64
       Timeout: 10
       MemorySize: 128
+      Environment:
+        Variables:
+          JWT_SECRET: !Ref JwtSecret
       Role: !GetAtt LambdaExecutionRole.Arn
 
   # API Gateway Account para habilitar CloudWatch logs
@@ -506,16 +557,14 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service: apigateway.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
-
-
+        - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 
 Outputs:
   ApiEndpoint:

@@ -30,6 +30,8 @@ env:
   DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
   DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
 
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
 jobs:
   delete-feature:
     if: startsWith(github.event.ref, 'feature') && github.event_name == 'delete'
@@ -193,7 +195,7 @@ jobs:
             --stack-name reservas-prod \
             --capabilities CAPABILITY_IAM \
             --region ${AWS_REGION} \
-            --parameter-overrides "AppName=reservas AppEnv=prod DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=${DATABASE_NAME} " \
+            --parameter-overrides "AppName=reservas AppEnv=prod DatabaseUsername=${DATABASE_USERNAME} DatabasePassword=${DATABASE_PASSWORD} DatabaseName=${DATABASE_NAME} JwtSecret=${JWT_SECRET} " \
             --s3-bucket ${ARTIFACTS_BUCKET} \
             --image-repository ${IMAGE_REPOSITORY} \
             --no-fail-on-empty-changeset \
