@@ -5,6 +5,8 @@ const app = express();
 const helmet = require("helmet");
 const errorHandler = require("./middleware/validationMiddleware");
 
+const { StatusCodes } = require("http-status-codes");
+
 const api = require("./routes");
 
 app.use(helmet());

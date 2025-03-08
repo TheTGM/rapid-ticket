@@ -1,7 +1,6 @@
 const { StatusCodes } = require('http-status-codes');
 const reservationModel = require('../models/reservationModel');
 const { cacheAside } = require('../services/cacheService');
-const { invalidateCache, invalidateCachePattern } = require('../config/redis');
 const { v4: uuidv4 } = require('uuid');
 const sqsService = require('../services/sqsService');
 
