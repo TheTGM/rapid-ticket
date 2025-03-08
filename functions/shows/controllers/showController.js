@@ -9,11 +9,8 @@ const getAllShows = async (req, res, next) => {
       page = 1,
       limit = 10,
       sortBy = "id",
-      sortOrder = "DESC",
+      sortOrder = "ASC",
     } = req.query;
-
-    console.log(req.query);
-    console.log(req.params);
 
     // Construir clave de caché basada en los parámetros
     const cacheKey = `shows:all:page=${page}:limit=${limit}:sort=${sortBy}:order=${sortOrder}`;
