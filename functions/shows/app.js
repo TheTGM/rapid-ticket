@@ -1,3 +1,4 @@
+const { StatusCodes } = require("http-status-codes");
 const serverlessExpress = require("@codegenie/serverless-express");
 const express = require("express");
 const cors = require("cors");
