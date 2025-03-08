@@ -10,7 +10,7 @@ const getAllShows = async (req, res, next) => {
       limit = 10,
       sortBy = "id",
       sortOrder = "DESC",
-    } = req.params;
+    } = req.query;
 
     console.log(req.query);
     console.log(req.params);
