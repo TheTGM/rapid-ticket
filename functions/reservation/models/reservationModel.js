@@ -1,3 +1,4 @@
+const { query } = require("../config/db");
 
 const checkSeatsAvailabilityPreliminary = async (functionId, seatIds) => {
   if (!functionId || !Array.isArray(seatIds) || seatIds.length === 0) {
