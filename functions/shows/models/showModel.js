@@ -69,37 +69,7 @@ const getShowById = async (id) => {
   return result.rows[0] || null;
 };
 
-const getShowFunctions = async (showId) => {
-  const sql = `
-    SELECT 
-      f.id, 
-      f.showId, 
-      f.venueId, 
-      f.functionDate, 
-      f.functionTime, 
-      f.status,
-      v.name as venueName,
-      v.address as venueAddress
-    FROM 
-      FunctionsTable f
-    JOIN 
-      Venues v ON f.venueId = v.id
-    WHERE 
-      f.showId = $1 AND 
-      f.status = 'scheduled' AND
-      f.functionDate >= CURRENT_DATE
-    ORDER BY 
-      f.functionDate ASC, 
-      f.functionTime ASC
-  `;
-
-  const result = await query(sql, [showId]);
-
-  return result.rows;
-};
-
 module.exports = {
   getAllShows,
   getShowById,
-  getShowFunctions,
 };

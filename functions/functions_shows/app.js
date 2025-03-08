@@ -1,35 +1,29 @@
 const serverlessExpress = require("@codegenie/serverless-express");
+const { StatusCodes } = require('http-status-codes');
 const express = require("express");
 const cors = require("cors");
+const helmet = require('helmet');
+const errorHandler = require('./middleware/validationMiddleware');
 
 const app = express();
 
 const api = require("./routes");
 
 // Middlewares
-app.use(cors({ origin: "*" }));
+app.use(helmet());
+app.use(cors());
 app.use(express.json());
 
 // Lambda main route
 app.use("", api);
 
 // Middlewares
-app.use(function (error, req, res, next) {
-  if (error instanceof Object) {
-    if (error.code) {
-      res.status(error.code).json({
-        error: { message: error.message },
-      });
-    } else {
-      res.status(500).json({
-        error: { ...error },
-      });
-    }
-  } else {
-    res.status(500).json({
-      error: { message: error },
-    });
-  }
+app.use((req, res) => {
+  res.status(StatusCodes.NOT_FOUND).json({
+    message: 'Recurso no encontrado'
+  });
 });
+
+app.use(errorHandler);
 
 module.exports.handler = serverlessExpress({ app });

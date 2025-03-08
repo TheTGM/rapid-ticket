@@ -1,16 +1,17 @@
 const express = require('express');
-const { StatusCodes } = require('http-status-codes');
-const { showFunctionsShowsMiddleware } = require('./middleware/validationMiddleware');
-const api = express.Router();
+const router = express.Router();
+const functionController = require('./controllers/functionController');
 
+router.get('/', functionController.getAllFunctions);
 
-api.post('/testShow', showFunctionsShowsMiddleware, async (req, res, next) => {
-    try {
-        return res.status(StatusCodes.OK).json({ message: "ok" });
-    } catch (error) {
-        console.error("error API create payment: ", error);
-        next(error);
-    }
-});
+router.get('/search', functionController.searchFunctions);
 
-module.exports = api;
+router.get('/stats', functionController.getFunctionsOccupancyStats);
+
+router.get('/invalidate-cache', functionController.invalidateFunctionsCache);
+
+router.get('/show/:showId', functionController.getFunctionsByShow);
+
+router.get('/:id', functionController.getFunctionDetails);
+
+module.exports = router;

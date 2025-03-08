@@ -1,7 +1,6 @@
 const { StatusCodes } = require("http-status-codes");
 const showModel = require("../models/showModel");
 const { cacheAside } = require("../services/cacheService");
-// const { invalidateCache } = require("../config/redis");
 
 const getAllShows = async (req, res, next) => {
   try {
@@ -67,36 +66,7 @@ const getShowById = async (req, res, next) => {
   }
 };
 
-const getShowFunctions = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    if (!id || isNaN(parseInt(id, 10))) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        message: "ID de show inválido",
-      });
-    }
-
-    const cacheKey = `shows:id=${id}:functions`;
-
-    const functions = await cacheAside(
-      cacheKey,
-      () => showModel.getShowFunctions(parseInt(id, 10)),
-      1800
-    );
-
-    return res.status(StatusCodes.OK).json({
-      message: "Funciones obtenidas con éxito",
-      data: functions,
-    });
-  } catch (error) {
-    console.error("Error al obtener funciones del show:", error);
-    next(error);
-  }
-};
-
 module.exports = {
   getAllShows,
-  getShowById,
-  getShowFunctions,
+  getShowById
 };
