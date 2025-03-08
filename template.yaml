@@ -265,7 +265,7 @@ Resources:
   ReservationQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationQueue-${AppEnv}
+      QueueName: !Sub ${AppName}-ReservationQueue-nofifo-${AppEnv}
       ContentBasedDeduplication: true
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600 # 14 días
@@ -276,7 +276,7 @@ Resources:
   ReservationDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationDLQ-${AppEnv}
+      QueueName: !Sub ${AppName}-ReservationDLQ-nofifo-${AppEnv}
       MessageRetentionPeriod: 1209600 # 14 días
 
   # IAM Roles para Lambdas
