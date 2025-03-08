@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-
 const JWT_SECRET = process.env.JWT_SECRET;
 
 exports.handler = async (event) => {
@@ -9,20 +8,16 @@ exports.handler = async (event) => {
     throw new Error('Unauthorized: No authorization header provided');
   }
 
-  // Verificar formato Bearer token
   const tokenValue = event.authorizationToken.replace('Bearer ', '');
   
   try {
-    // Verificar el token JWT
     const decodedToken = jwt.verify(tokenValue, JWT_SECRET);
     
-    // Extraer información del usuario del token
     const userId = decodedToken.sub;
     const username = decodedToken.username;
     const userRole = decodedToken.role;
     
-    // Determinar nivel de acceso basado en el rol
-    const effect = 'Allow'; // Siempre permitir si el token es válido
+    const effect = 'Allow';
     
     // Generar la política de autorización
     return generatePolicy(userId, effect, event.methodArn, {

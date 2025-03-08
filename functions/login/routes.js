@@ -6,7 +6,7 @@ const bcrypt = require("bcryptjs");
 const api = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const TOKEN_EXPIRY = "24h"; // Expiración del token: 24 horas
+const TOKEN_EXPIRY = "24h";
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -19,7 +19,6 @@ api.post("/login", async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // Validar credenciales - CORREGIDO: Usar res.status().json() para enviar la respuesta
     if (!username || !password) {
       return res.status(400).json({
         message: "Usuario y contraseña son requeridos",
@@ -28,13 +27,6 @@ api.post("/login", async (req, res, next) => {
 
     const client = await pool.connect();
     try {
-      // Opción 1: Con comillas dobles para respetar mayúsculas
-      // const result = await client.query(
-      //   'SELECT id, username, "passwordHash", email, name, role, status FROM "Users" WHERE username = $1',
-      //   [username]
-      // );
-
-      // Opción 2: Sin comillas, PostgreSQL convierte a minúsculas
       const result = await client.query(
         "SELECT id, username, passwordhash, email, name, role, status FROM users WHERE username = $1",
         [username]
@@ -47,14 +39,12 @@ api.post("/login", async (req, res, next) => {
       const user = result.rows[0];
       console.log("user: ", user);
 
-      // CORREGIDO: Usar res.status().json() para enviar la respuesta
       if (user.status !== "active") {
         return res.status(403).json({
           message: "Cuenta inactiva o suspendida",
         });
       }
 
-      // Importante: Asegurarnos que passwordhash existe
       if (!user.passwordhash) {
         console.error(
           "Error: passwordhash es undefined para el usuario:",
@@ -65,17 +55,14 @@ api.post("/login", async (req, res, next) => {
         });
       }
 
-      // La propiedad correcta es 'passwordhash' (todo en minúsculas)
       const passwordMatch = await bcrypt.compare(password, user.passwordhash);
       if (!passwordMatch) {
         return res.status(401).json({ message: "Credenciales inválidas" });
       }
 
-      console.log("passwordMatch: ", passwordMatch);
-
       const token = jwt.sign(
         {
-          sub: user.id, // Estándar JWT para ID
+          sub: user.id,
           username: user.username,
           email: user.email,
           name: user.name,
@@ -88,14 +75,7 @@ api.post("/login", async (req, res, next) => {
       );
 
       return res.status(200).json({
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
+        token: "Bearer " + token,
       });
     } catch (error) {
       console.error("Error en consulta de login: ", error);

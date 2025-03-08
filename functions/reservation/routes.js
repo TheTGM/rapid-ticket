@@ -4,7 +4,6 @@ const { Pool } = require("pg");
 const { showReservationMiddleware } = require("./middleware/validationMiddleware");
 const api = express.Router();
 
-// Configuración de la conexión a PostgreSQL
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
