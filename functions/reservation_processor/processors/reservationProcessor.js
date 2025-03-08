@@ -260,12 +260,61 @@ const processExpireReservation = async (messageData) => {
 
 const processMessage = async (message) => {
   try {
-    console.log("Procesando mensaje:", message.Body);
-    const messageBody = JSON.parse(message.Body);
-    const { type, data } = messageBody;
+    // Verificar que el mensaje sea válido
+    if (!message) {
+      console.error("Mensaje inválido (undefined)");
+      return {
+        success: false,
+        message: "Mensaje inválido (undefined)",
+      };
+    }
 
+    // Verificar que el cuerpo del mensaje esté definido
+    if (!message.Body) {
+      console.error("Cuerpo del mensaje inválido:", message);
+      return {
+        success: false,
+        message: "Cuerpo del mensaje es undefined o null",
+      };
+    }
+
+    // Log del cuerpo del mensaje para diagnóstico
+    console.log("Cuerpo del mensaje a procesar:", message.Body);
+
+    let messageBody;
+    try {
+      messageBody = JSON.parse(message.Body);
+    } catch (parseError) {
+      console.error("Error al parsear el cuerpo del mensaje:", parseError);
+      console.error("Contenido del cuerpo:", message.Body);
+      return {
+        success: false,
+        message: `Error de formato JSON: ${parseError.message}`,
+      };
+    }
+
+    // Verificar estructura del mensaje parseado
+    if (!messageBody || !messageBody.type) {
+      console.error("Formato de mensaje inválido:", messageBody);
+      return {
+        success: false,
+        message: "Formato de mensaje inválido: falta el campo 'type'",
+      };
+    }
+
+    const { type, data } = messageBody;
     console.log(`Procesando mensaje tipo: ${type}`);
 
+    // Verificar que los datos estén presentes
+    if (!data) {
+      console.error(`Mensaje de tipo ${type} sin datos`);
+      return {
+        success: false,
+        message: `Mensaje de tipo ${type} no contiene datos`,
+      };
+    }
+
+    // Procesar según el tipo de mensaje
     switch (type) {
       case "CREATE_RESERVATION":
         return await processCreateReservation(data);
@@ -293,6 +342,7 @@ const processMessage = async (message) => {
       success: false,
       message: "Error al procesar mensaje",
       error: error.message,
+      stack: error.stack,
     };
   }
 };
