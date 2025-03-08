@@ -219,7 +219,7 @@ const getFunctionDetails = async (functionId) => {
 
   const seatsResult = await query(seatsSql, [
     functionId,
-    functionDetails.venueId,
+    functionDetails.venueid,
   ]);
 
   console.log("seatsResult.rows", seatsResult.rows);
