@@ -4,8 +4,8 @@ const showController = require('./controllers/showController');
 
 router.get('/getAllShows', showController.getAllShows);
 
-router.get('/:id', showController.getShowById);
+router.get('getShowById/:id', showController.getShowById);
 
-router.get('/:id/functions', showController.getShowFunctions);
+router.get('getShowFunctions/:id/functions', showController.getShowFunctions);
 
 module.exports = router;
