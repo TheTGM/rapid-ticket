@@ -60,6 +60,34 @@ exports.handler = async (event, context) => {
               result.message
             );
           }
+
+          if (!result.success) {
+            console.error(
+              `Error al procesar mensaje ${record.messageId}:`,
+              result.message
+            );
+
+            // Obtener el número de intentos de este mensaje
+            const receiveCount = parseInt(
+              record.attributes.ApproximateReceiveCount,
+              10
+            );
+            console.log(
+              `Intento #${receiveCount} para mensaje ${record.messageId}`
+            );
+
+            // Después de 3 intentos, debemos eliminarlo manualmente para evitar bloqueos
+            if (receiveCount >= 3) {
+              console.log(
+                `Eliminando mensaje fallido ${record.messageId} después de ${receiveCount} intentos`
+              );
+              const sqsService = require("../services/sqsService");
+              await sqsService.deleteMessage(record.receiptHandle);
+              console.log(
+                `Mensaje fallido ${record.messageId} eliminado de la cola SQS`
+              );
+            }
+          }
         } catch (error) {
           console.error(
             `Error al procesar mensaje ${record.messageId}:`,

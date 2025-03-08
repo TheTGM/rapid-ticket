@@ -270,6 +270,16 @@ Resources:
       ContentBasedDeduplication: true
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600 # 14 días
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ReservationDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  ReservationDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${AppName}-ReservationDLQ-${AppEnv}.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600 # 14 días
 
   # IAM Roles para Lambdas
   LambdaExecutionRole:

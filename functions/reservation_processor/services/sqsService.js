@@ -28,7 +28,8 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
     console.log("[SQS] Tipo de mensaje:", messageType);
     
     // Para colas FIFO, necesitamos un ID de grupo y un ID de deduplicación
-    const groupId = `group-${messageType}`;
+    const uniqueId = (messageBody.temporaryReservationId || messageBody.reservationId || Date.now().toString());
+    const groupId = `group-${uniqueId}`;
     
     // Si no se proporciona un ID de deduplicación, generar uno basado en timestamp y contenido
     const dedupId = deduplicationId || 
