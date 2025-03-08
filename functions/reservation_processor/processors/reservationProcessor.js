@@ -2,10 +2,12 @@ const { pool } = require("../config/db");
 const reservationModel = require("../models/reservationModel");
 const { invalidateCachePattern } = require("../config/redis");
 
+// Función de utilidad para ejecutar consultas parametrizadas
 const query = async (text, params = []) => {
   const result = await pool.query(text, params);
   return result;
 };
+
 const processCreateReservation = async (messageData) => {
   console.log(
     "Procesando creación de reserva:",
@@ -23,9 +25,14 @@ const processCreateReservation = async (messageData) => {
   } = messageData;
 
   try {
-    const client = await query("BEGIN");
+    // Obtener cliente del pool para transacción
+    const client = await pool.connect();
 
     try {
+      // Iniciar transacción
+      await client.query("BEGIN");
+
+      // Resto del código con transacción
       const availabilityCheck = await reservationModel.checkSeatsAvailability(
         client,
         functionId,
@@ -148,6 +155,7 @@ const processCreateReservation = async (messageData) => {
       await client.query("ROLLBACK");
       throw error;
     } finally {
+      // Liberar cliente
       client.release();
     }
   } catch (error) {
@@ -165,15 +173,6 @@ const processCreateReservation = async (messageData) => {
       error: error.message,
     };
   }
-  /**
-   * Processes a confirmation of a reservation.
-   *
-   * @param {Object} messageData - Message data from the SQS message.
-   * @param {number} messageData.reservationId - ID of the reservation to confirm.
-   *
-   * @returns {Promise<Object>} - Result of the confirmation process.
-   * @throws {Error} If there is an error during the confirmation process.
-   */
 };
 
 const processConfirmReservation = async (messageData) => {
@@ -283,7 +282,8 @@ const processMessage = async (message) => {
     }
 
     // Verificar que el cuerpo del mensaje esté definido
-    if (!message.Body) {
+    const messageBody = message.Body || message.body;
+    if (!messageBody) {
       console.error("Cuerpo del mensaje inválido:", message);
       return {
         success: false,
@@ -292,14 +292,20 @@ const processMessage = async (message) => {
     }
 
     // Log del cuerpo del mensaje para diagnóstico
-    console.log("Cuerpo del mensaje a procesar:", message.Body);
+    console.log("Cuerpo del mensaje a procesar:", messageBody);
 
-    let messageBody;
+    let parsedMessage;
     try {
-      messageBody = JSON.parse(message.Body);
+      // Si ya es un objeto, usarlo directamente
+      if (typeof messageBody === 'object' && messageBody !== null) {
+        parsedMessage = messageBody;
+      } else {
+        // Intentar parsear como JSON
+        parsedMessage = JSON.parse(messageBody);
+      }
     } catch (parseError) {
       console.error("Error al parsear el cuerpo del mensaje:", parseError);
-      console.error("Contenido del cuerpo:", message.Body);
+      console.error("Contenido del cuerpo:", messageBody);
       return {
         success: false,
         message: `Error de formato JSON: ${parseError.message}`,
@@ -307,15 +313,15 @@ const processMessage = async (message) => {
     }
 
     // Verificar estructura del mensaje parseado
-    if (!messageBody || !messageBody.type) {
-      console.error("Formato de mensaje inválido:", messageBody);
+    if (!parsedMessage || !parsedMessage.type) {
+      console.error("Formato de mensaje inválido:", parsedMessage);
       return {
         success: false,
         message: "Formato de mensaje inválido: falta el campo 'type'",
       };
     }
 
-    const { type, data } = messageBody;
+    const { type, data } = parsedMessage;
     console.log(`Procesando mensaje tipo: ${type}`);
 
     // Verificar que los datos estén presentes
@@ -374,7 +380,7 @@ const processExpiredReservations = async () => {
         EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - createdAt)) > 600
     `;
 
-    const result = await query(sql);
+    const result = await pool.query(sql);
 
     if (result.rows.length === 0) {
       console.log("No se encontraron reservas expiradas");
