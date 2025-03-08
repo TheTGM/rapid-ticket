@@ -38,66 +38,87 @@ exports.handler = async (event, context) => {
       console.log(`Recibidos ${event.Records.length} mensajes de SQS`);
 
       for (const record of event.Records) {
-        console.log(`Procesando mensaje con ID: ${record.messageId}`);
-
+        console.log(`INICIO: Procesando mensaje ID: ${record.messageId}, GroupId: ${record.attributes.MessageGroupId || 'N/A'}, ApproximateReceiveCount: ${record.attributes.ApproximateReceiveCount || '1'}`);
+        
         try {
-          // Procesar el mensaje (ahora con tolerancia a diferentes formatos)
+          // Obtener el cliente SQS al inicio
+          const sqsService = require("../services/sqsService");
+          
+          // Procesar el mensaje
           const result = await processMessage(record);
+          
           results.push({
             messageId: record.messageId,
             result,
           });
 
-          if (result.success) {
-            console.log(`Mensaje ${record.messageId} procesado con éxito`);
-
-            const sqsService = require("../services/sqsService");
+          console.log(`FIN: Mensaje ${record.messageId} procesado. Resultado: ${result.success ? 'SUCCESS' : 'FAILURE'}`);
+          
+          // IMPORTANTE: Siempre eliminar el mensaje SQS, incluso en caso de fallo
+          try {
             await sqsService.deleteMessage(record.receiptHandle);
             console.log(`Mensaje ${record.messageId} eliminado de la cola SQS`);
-          } else {
-            console.error(
-              `Error al procesar mensaje ${record.messageId}:`,
-              result.message
-            );
+          } catch (deleteError) {
+            console.error(`ERROR crítico al eliminar mensaje ${record.messageId}:`, deleteError);
           }
-
+          
+          // Si falló y necesitamos reintentar, enviamos un nuevo mensaje
           if (!result.success) {
-            console.error(
-              `Error al procesar mensaje ${record.messageId}:`,
-              result.message
-            );
-
-            // Obtener el número de intentos de este mensaje
-            const receiveCount = parseInt(
-              record.attributes.ApproximateReceiveCount,
-              10
-            );
-            console.log(
-              `Intento #${receiveCount} para mensaje ${record.messageId}`
-            );
-
-            // Después de 3 intentos, debemos eliminarlo manualmente para evitar bloqueos
-            if (receiveCount >= 3) {
-              console.log(
-                `Eliminando mensaje fallido ${record.messageId} después de ${receiveCount} intentos`
+            const receiveCount = parseInt(record.attributes.ApproximateReceiveCount || '1', 10);
+            
+            // Si no hemos excedido el máximo de reintentos, creamos un nuevo mensaje
+            if (receiveCount < 3) {
+              // Extraer el contenido original y crear un nuevo mensaje para reintento
+              let messageBody;
+              try {
+                messageBody = typeof record.body === 'string' ? JSON.parse(record.body) : record.body;
+              } catch (parseError) {
+                console.error(`Error al parsear body del mensaje para reintento:`, parseError);
+                messageBody = { 
+                  type: 'RETRY_MESSAGE',
+                  data: record.body,
+                  originalMessageId: record.messageId
+                };
+              }
+              
+              // Añadir información de reintento
+              messageBody.retryCount = receiveCount;
+              messageBody.retryTimestamp = new Date().toISOString();
+              messageBody.originalMessageId = record.messageId;
+              
+              // Generar un ID de deduplicación único para el reintento
+              const retryDeduplicationId = `retry-${record.messageId}-${Date.now()}`;
+              
+              // Enviar como un nuevo mensaje a la cola
+              await sqsService.sendMessage(
+                messageBody,
+                messageBody.type || 'RETRY_MESSAGE',
+                retryDeduplicationId
               );
-              const sqsService = require("../services/sqsService");
-              await sqsService.deleteMessage(record.receiptHandle);
-              console.log(
-                `Mensaje fallido ${record.messageId} eliminado de la cola SQS`
-              );
+              
+              console.log(`Reintento #${receiveCount} creado para mensaje ${record.messageId}`);
+            } else {
+              console.log(`Mensaje ${record.messageId} abandonado después de ${receiveCount} intentos`);
+              // Aquí podrías implementar un registro en base de datos o alguna alerta
             }
           }
         } catch (error) {
-          console.error(
-            `Error al procesar mensaje ${record.messageId}:`,
-            error
-          );
+          console.error(`Error grave al procesar mensaje ${record.messageId}:`, error);
+          
           results.push({
             messageId: record.messageId,
             error: error.message,
             stack: error.stack,
           });
+          
+          // CRÍTICO: Siempre eliminar el mensaje para evitar bloqueos
+          try {
+            const sqsService = require("../services/sqsService");
+            await sqsService.deleteMessage(record.receiptHandle);
+            console.log(`Mensaje ${record.messageId} eliminado de la cola SQS después de error fatal`);
+          } catch (deleteError) {
+            console.error(`ERROR CRÍTICO: No se pudo eliminar mensaje ${record.messageId}:`, deleteError);
+          }
         }
       }
     } else {
