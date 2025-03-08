@@ -1,7 +1,7 @@
 const { Pool } = require("pg");
 const express = require("express");
 const { StatusCodes } = require("http-status-codes");
-const { getAllShows } = require("../../model/enties/shows");
+const { getAllShows } = require("../../model/entities/shows");
 const api = express.Router();
 
 const pool = new Pool({
