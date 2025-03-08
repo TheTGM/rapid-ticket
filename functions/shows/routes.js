@@ -14,9 +14,6 @@ const pool = new Pool({
 
 api.get("/getAllShows", async (req, res, next) => {
   try {
-    const showsPayload = req.body;
-    console.info("body: ", showsPayload);
-
     const client = await pool.connect();
     try {
       const response = await getAllShows(client);
