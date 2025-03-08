@@ -41,8 +41,8 @@ const getAllShows = async (options = {}) => {
     shows: result.rows,
     pagination: {
       total: totalShows,
-      page,
-      limit,
+      page: Number(page),
+      limit: Number(limit),
       pages: Math.ceil(totalShows / limit),
     },
   };
