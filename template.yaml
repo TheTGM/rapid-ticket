@@ -265,8 +265,7 @@ Resources:
   ReservationQueue1:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationQueue1-nofifo-${AppEnv}
-      ContentBasedDeduplication: true
+      QueueName: !Sub ${AppName}-ReservationQueue1-nofifo1-${AppEnv}
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600 # 14 días
       RedrivePolicy:
@@ -276,7 +275,7 @@ Resources:
   ReservationDeadLetterQueue1:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationDLQ-nofifo-${AppEnv}
+      QueueName: !Sub ${AppName}-ReservationDLQ-nofifo1-${AppEnv}
       MessageRetentionPeriod: 1209600 # 14 días
 
   # IAM Roles para Lambdas
