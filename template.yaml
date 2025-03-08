@@ -262,18 +262,18 @@ Resources:
       CacheSubnetGroupName: !Ref ElastiCacheSubnetGroup
 
   # SQS (Cola de mensajes)
-  ReservationQueue:
+  ReservationQueue1:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationQueue-nofifo-${AppEnv}
+      QueueName: !Sub ${AppName}-ReservationQueue1-nofifo-${AppEnv}
       ContentBasedDeduplication: true
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600 # 14 días
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt ReservationDeadLetterQueue.Arn
+        deadLetterTargetArn: !GetAtt ReservationDeadLetterQueue1.Arn
         maxReceiveCount: 5
 
-  ReservationDeadLetterQueue:
+  ReservationDeadLetterQueue1:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub ${AppName}-ReservationDLQ-nofifo-${AppEnv}
@@ -307,7 +307,7 @@ Resources:
               - sqs:ReceiveMessage
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
-            Resource: !GetAtt ReservationQueue.Arn
+            Resource: !GetAtt ReservationQueue1.Arn
       Roles:
         - !Ref LambdaExecutionRole
 
@@ -405,7 +405,7 @@ Resources:
           DB_PASSWORD: !Ref DatabasePassword
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
-          QUEUE_URL: !Ref ReservationQueue
+          QUEUE_URL: !Ref ReservationQueue1
           JWT_SECRET: !Ref JwtSecret
       Events:
         ReservationApi:
@@ -451,13 +451,13 @@ Resources:
           DB_PASSWORD: !Ref DatabasePassword
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
-          QUEUE_URL: !Ref ReservationQueue
+          QUEUE_URL: !Ref ReservationQueue1
           JWT_SECRET: !Ref JwtSecret
       Events:
         SQSEvent:
           Type: SQS
           Properties:
-            Queue: !GetAtt ReservationQueue.Arn
+            Queue: !GetAtt ReservationQueue1.Arn
             BatchSize: 10
             Enabled: true
             MaximumBatchingWindowInSeconds: 0
@@ -604,4 +604,4 @@ Outputs:
 
   QueueURL:
     Description: "URL de la cola SQS"
-    Value: !Ref ReservationQueue
+    Value: !Ref ReservationQueue1
