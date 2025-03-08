@@ -388,8 +388,7 @@ const createReservationTest = async (req, res, next) => {
       `ALTER TABLE Reservations ADD COLUMN temporaryId VARCHAR(100);
 
 -- Crear un índice para búsquedas eficientes por temporaryId
-CREATE INDEX idx_reservations_temporary_id ON Reservations(temporaryId);`,
-      [req.user.id]
+CREATE INDEX idx_reservations_temporary_id ON Reservations(temporaryId);`
     );
     const user = respose.rows[0];
 
