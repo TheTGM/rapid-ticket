@@ -17,6 +17,4 @@ router.get('/getUserReservations/user/me', authMiddleware.verifyToken, reservati
 
 router.get('/getReservation/:id/time', reservationController.checkReservationTime);
 
-router.get('/createReservationTest', reservationController.createReservationTest);
-
 module.exports = router;

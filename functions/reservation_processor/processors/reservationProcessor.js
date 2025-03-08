@@ -260,6 +260,7 @@ const processExpireReservation = async (messageData) => {
 
 const processMessage = async (message) => {
   try {
+    console.log("Procesando mensaje:", message.Body);
     const messageBody = JSON.parse(message.Body);
     const { type, data } = messageBody;
 

@@ -383,41 +383,6 @@ const generateTicketCode = (reservationId) => {
   return `TKT-${timestamp}-${random}-${id}`;
 };
 
-const createReservationTest = async (req, res, next) => {
-  try {
-    const client = await pool.connect();
-    try {
-      const result = client.query(
-        `ALTER TABLE Reservations ADD COLUMN temporaryId VARCHAR(100);
-  
-        -- Crear un índice para búsquedas eficientes por temporaryId
-        CREATE INDEX idx_reservations_temporary_id ON Reservations(temporaryId);`
-      );
-      return res.status(StatusCodes.CREATED).json({
-        message: "Reserva creada con éxito",
-        data: {
-          result,
-        },
-      });
-    } catch (error) {
-      console.log(error);
-    } finally {
-      client.release();
-    }
-    
-
-    return res.status(StatusCodes.CREATED).json({
-      message: "Reserva creada con éxito",
-      data: {
-        user,
-      },
-    });
-  } catch (error) {
-    console.error("Error al crear reserva:", error);
-    next(error);
-  }
-};
-
 module.exports = {
   createReservation,
   getReservation,
@@ -426,5 +391,4 @@ module.exports = {
   getUserReservations,
   checkReservationTime,
   checkReservationStatus,
-  createReservationTest,
 };
