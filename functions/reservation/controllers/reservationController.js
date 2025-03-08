@@ -3,7 +3,8 @@ const reservationModel = require("../models/reservationModel");
 const { cacheAside } = require("../services/cacheService");
 const { v4: uuidv4 } = require("uuid");
 const sqsService = require("../services/sqsService");
-const { query } = require("../config/db");
+const { query, pool } = require("../config/db");
+const e = require("express");
 
 const createReservation = async (req, res, next) => {
   try {
@@ -384,13 +385,26 @@ const generateTicketCode = (reservationId) => {
 
 const createReservationTest = async (req, res, next) => {
   try {
-    const respose = await query(
-      `ALTER TABLE Reservations ADD COLUMN temporaryId VARCHAR(100);
-
--- Crear un índice para búsquedas eficientes por temporaryId
-CREATE INDEX idx_reservations_temporary_id ON Reservations(temporaryId);`
-    );
-    const user = respose.rows[0];
+    const client = await pool.connect();
+    try {
+      const result = client.query(
+        `ALTER TABLE Reservations ADD COLUMN temporaryId VARCHAR(100);
+  
+        -- Crear un índice para búsquedas eficientes por temporaryId
+        CREATE INDEX idx_reservations_temporary_id ON Reservations(temporaryId);`
+      );
+      return res.status(StatusCodes.CREATED).json({
+        message: "Reserva creada con éxito",
+        data: {
+          result,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+    } finally {
+      client.release();
+    }
+    
 
     return res.status(StatusCodes.CREATED).json({
       message: "Reserva creada con éxito",
