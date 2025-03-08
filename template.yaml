@@ -349,7 +349,7 @@ Resources:
           DB_HOST: !GetAtt RDSInstance.Endpoint.Address
           DB_PORT: !GetAtt RDSInstance.Endpoint.Port
           DB_NAME: !Ref DatabaseName
-          DB_USER: !Ref DatabaseUsername
+          DB_USERNAME: !Ref DatabaseUsername
           DB_PASSWORD: !Ref DatabasePassword
           CACHE_ENDPOINT: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
           CACHE_PORT: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
