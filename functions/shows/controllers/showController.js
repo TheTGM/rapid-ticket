@@ -6,10 +6,10 @@ const { cacheAside } = require("../services/cacheService");
 const getAllShows = async (req, res, next) => {
   try {
     const {
-      page,
-      limit,
-      sortBy,
-      sortOrder,
+      page = 1,
+      limit = 10,
+      sortBy = "id",
+      sortOrder = "ASC",
     } = req.query;
 
     // Construir clave de caché basada en los parámetros
