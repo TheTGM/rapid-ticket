@@ -2,7 +2,7 @@ const serverlessExpress = require("@codegenie/serverless-express");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const errorHandler = require("./middleware/errorHandler");
+const errorHandler = require("./middleware/validationMiddleware");
 
 const app = express();
 
