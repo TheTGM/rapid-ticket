@@ -176,17 +176,55 @@ const processCreateReservation = async (messageData) => {
 };
 
 const processConfirmReservation = async (messageData) => {
-  console.log("Procesando confirmación de reserva:", messageData.reservationId);
+  console.log(
+    "Procesando confirmación de reserva:",
+    JSON.stringify(messageData, null, 2)
+  );
 
   try {
-    const { reservationId } = messageData;
+    // Extraer el ID de reserva (puede estar en diferentes formatos de mensaje)
+    let reservationId;
 
+    if (typeof messageData === "object") {
+      // Caso 1: Formato estándar con propiedad data
+      if (messageData.data && messageData.data.reservationId) {
+        reservationId = messageData.data.reservationId;
+      }
+      // Caso 2: Formato directo con reservationId en el objeto principal
+      else if (messageData.reservationId) {
+        reservationId = messageData.reservationId;
+      }
+      // Caso 3: Si es un número directamente
+      else if (typeof messageData === "number") {
+        reservationId = messageData;
+      }
+      // Caso 4: Si no hay reservationId en una estructura conocida
+      else {
+        throw new Error(
+          "No se encontró reservationId en el mensaje: " +
+            JSON.stringify(messageData)
+        );
+      }
+    } else if (
+      typeof messageData === "string" &&
+      !isNaN(parseInt(messageData, 10))
+    ) {
+      // Caso 5: Si es un string numérico
+      reservationId = parseInt(messageData, 10);
+    } else {
+      throw new Error("Formato de datos no compatible: " + typeof messageData);
+    }
+
+    console.log(`ID de reserva extraído: ${reservationId}`);
+
+    // Actualizar el estado de la reserva
     const updatedReservation = await reservationModel.updateReservationStatus(
       reservationId,
       "confirmed",
       "Confirmada por el cliente"
     );
 
+    // Invalidar caché
     await invalidateCachePattern(`reservations:*`);
 
     return {
@@ -199,7 +237,7 @@ const processConfirmReservation = async (messageData) => {
 
     return {
       success: false,
-      reservationId: messageData.reservationId,
+      reservationId: messageData.reservationId || "desconocido",
       message: "Error al confirmar la reserva",
       error: error.message,
     };
@@ -272,6 +310,8 @@ const processExpireReservation = async (messageData) => {
 
 const processMessage = async (message) => {
   try {
+    console.log("Procesando mensaje:", JSON.stringify(message, null, 2));
+
     // Verificar que el mensaje sea válido
     if (!message) {
       console.error("Mensaje inválido (undefined)");
@@ -281,78 +321,148 @@ const processMessage = async (message) => {
       };
     }
 
-    // Verificar que el cuerpo del mensaje esté definido
-    const messageBody = message.Body || message.body;
-    if (!messageBody) {
-      console.error("Cuerpo del mensaje inválido:", message);
-      return {
-        success: false,
-        message: "Cuerpo del mensaje es undefined o null",
-      };
-    }
+    // Verificar si hay cuerpo del mensaje o si el mensaje ya es el contenido
+    let messageBody;
 
-    // Log del cuerpo del mensaje para diagnóstico
-    console.log("Cuerpo del mensaje a procesar:", messageBody);
+    // Caso 1: El mensaje tiene una propiedad Body o body
+    if (message.Body || message.body) {
+      const rawBody = message.Body || message.body;
+      console.log("Mensaje tiene propiedad Body. Tipo:", typeof rawBody);
 
-    let parsedMessage;
-    try {
-      // Si ya es un objeto, usarlo directamente
-      if (typeof messageBody === 'object' && messageBody !== null) {
-        parsedMessage = messageBody;
+      // Convertir a objeto si es string
+      if (typeof rawBody === "string") {
+        try {
+          messageBody = JSON.parse(rawBody);
+        } catch (parseError) {
+          console.error("Error al parsear el cuerpo del mensaje:", parseError);
+          // Si no se puede parsear, tratarlo como mensaje directo
+          messageBody = { type: "DIRECT", data: { rawMessage: rawBody } };
+        }
+      } else if (typeof rawBody === "object") {
+        messageBody = rawBody;
       } else {
-        // Intentar parsear como JSON
-        parsedMessage = JSON.parse(messageBody);
-      }
-    } catch (parseError) {
-      console.error("Error al parsear el cuerpo del mensaje:", parseError);
-      console.error("Contenido del cuerpo:", messageBody);
-      return {
-        success: false,
-        message: `Error de formato JSON: ${parseError.message}`,
-      };
-    }
-
-    // Verificar estructura del mensaje parseado
-    if (!parsedMessage || !parsedMessage.type) {
-      console.error("Formato de mensaje inválido:", parsedMessage);
-      return {
-        success: false,
-        message: "Formato de mensaje inválido: falta el campo 'type'",
-      };
-    }
-
-    const { type, data } = parsedMessage;
-    console.log(`Procesando mensaje tipo: ${type}`);
-
-    // Verificar que los datos estén presentes
-    if (!data) {
-      console.error(`Mensaje de tipo ${type} sin datos`);
-      return {
-        success: false,
-        message: `Mensaje de tipo ${type} no contiene datos`,
-      };
-    }
-
-    // Procesar según el tipo de mensaje
-    switch (type) {
-      case "CREATE_RESERVATION":
-        return await processCreateReservation(data);
-
-      case "CONFIRM_RESERVATION":
-        return await processConfirmReservation(data);
-
-      case "CANCEL_RESERVATION":
-        return await processCancelReservation(data);
-
-      case "EXPIRE_RESERVATION":
-        return await processExpireReservation(data);
-
-      default:
-        console.warn(`Tipo de mensaje desconocido: ${type}`);
         return {
           success: false,
-          message: `Tipo de mensaje desconocido: ${type}`,
+          message: `Formato de cuerpo de mensaje no soportado: ${typeof rawBody}`,
         };
+      }
+    }
+    // Caso 2: El mensaje mismo es el contenido
+    else {
+      console.log(
+        "Mensaje no tiene propiedad Body. Asumiendo que el mensaje es el contenido"
+      );
+      messageBody = message;
+    }
+
+    console.log(
+      "Contenido del mensaje procesado:",
+      JSON.stringify(messageBody, null, 2)
+    );
+
+    // MANEJAR MENSAJES SIN ESTRUCTURA ESTÁNDAR
+    // Si el mensaje no tiene la estructura esperada pero tiene un reservationId,
+    // inferimos que es un mensaje de confirmación
+    if (!messageBody.type && messageBody.reservationId) {
+      console.log(
+        "Mensaje sin tipo pero con reservationId. Asumiendo CONFIRM_RESERVATION"
+      );
+
+      // Tratar como mensaje de confirmación
+      return await processConfirmReservation(messageBody);
+    }
+
+    // Si aún no hay un tipo definido, verificar otras propiedades para inferir el tipo
+    if (!messageBody.type) {
+      if (messageBody.temporaryReservationId) {
+        console.log(
+          "Mensaje sin tipo pero con temporaryReservationId. Asumiendo CREATE_RESERVATION"
+        );
+        return await processCreateReservation(messageBody);
+      } else if (messageBody.reason && messageBody.reservationId) {
+        if (messageBody.reason.includes("expirado")) {
+          console.log(
+            "Mensaje sin tipo pero con razón de expiración. Asumiendo EXPIRE_RESERVATION"
+          );
+          return await processExpireReservation(messageBody);
+        } else {
+          console.log(
+            "Mensaje sin tipo pero con razón de cancelación. Asumiendo CANCEL_RESERVATION"
+          );
+          return await processCancelReservation(messageBody);
+        }
+      } else {
+        console.error("No se pudo determinar el tipo de mensaje:", messageBody);
+        return {
+          success: false,
+          message:
+            "Formato de mensaje desconocido: no se pudo determinar el tipo",
+        };
+      }
+    }
+
+    // PROCESAMIENTO ESTÁNDAR PARA MENSAJES CON ESTRUCTURA CORRECTA
+    const { type, data } = messageBody;
+    console.log(`Procesando mensaje tipo: ${type}`);
+
+    // Para mensajes con estructura estándar, verificar que los datos estén presentes
+    if (type && !data) {
+      // Si hay tipo pero no hay datos, usar el cuerpo completo como datos
+      console.log(
+        "Mensaje tiene tipo pero no datos. Usando el cuerpo completo como datos"
+      );
+
+      // Extraer todo excepto 'type' como datos
+      const { type: _, ...extractedData } = messageBody;
+
+      switch (type) {
+        case "CREATE_RESERVATION":
+          return await processCreateReservation(extractedData);
+
+        case "CONFIRM_RESERVATION":
+          return await processConfirmReservation(extractedData);
+
+        case "CANCEL_RESERVATION":
+          return await processCancelReservation(extractedData);
+
+        case "EXPIRE_RESERVATION":
+          return await processExpireReservation(extractedData);
+
+        default:
+          console.warn(`Tipo de mensaje desconocido: ${type}`);
+          return {
+            success: false,
+            message: `Tipo de mensaje desconocido: ${type}`,
+          };
+      }
+    } else if (type && data) {
+      // Procesar según el tipo de mensaje (estructura estándar)
+      switch (type) {
+        case "CREATE_RESERVATION":
+          return await processCreateReservation(data);
+
+        case "CONFIRM_RESERVATION":
+          return await processConfirmReservation(data);
+
+        case "CANCEL_RESERVATION":
+          return await processCancelReservation(data);
+
+        case "EXPIRE_RESERVATION":
+          return await processExpireReservation(data);
+
+        default:
+          console.warn(`Tipo de mensaje desconocido: ${type}`);
+          return {
+            success: false,
+            message: `Tipo de mensaje desconocido: ${type}`,
+          };
+      }
+    } else {
+      console.error("Formato de mensaje inválido:", messageBody);
+      return {
+        success: false,
+        message: "Formato de mensaje inválido: estructura no reconocida",
+      };
     }
   } catch (error) {
     console.error("Error al procesar mensaje:", error);

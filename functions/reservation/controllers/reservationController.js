@@ -342,36 +342,6 @@ const cancelReservation = async (req, res, next) => {
   }
 };
 
-const getUserReservations = async (req, res, next) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(StatusCodes.UNAUTHORIZED).json({
-        message: "Usuario no autenticado",
-      });
-    }
-
-    const cacheKey = `reservations:user=${userId}`;
-
-    const cacheTTL = 300; // 5 minutos
-
-    const reservations = await cacheAside(
-      cacheKey,
-      () => reservationModel.getReservationsByUserId(userId),
-      cacheTTL
-    );
-
-    return res.status(StatusCodes.OK).json({
-      message: "Reservas obtenidas con éxito",
-      data: reservations,
-    });
-  } catch (error) {
-    console.error("Error al obtener reservas del usuario:", error);
-    next(error);
-  }
-};
-
 const checkReservationTime = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -425,7 +395,6 @@ module.exports = {
   getReservation,
   confirmReservation,
   cancelReservation,
-  getUserReservations,
   checkReservationTime,
   checkReservationStatus,
 };

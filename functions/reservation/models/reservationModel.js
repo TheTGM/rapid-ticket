@@ -470,41 +470,6 @@ const updateReservationStatus = async (reservationId, newStatus, updateReason = 
   }
 };
 
-/**
- * Obtiene las reservas de un usuario por su ID
- */
-const getReservationsByUserId = async (userId) => {
-  const sql = `
-    SELECT 
-      r.id,
-      r.customerName,
-      r.customerDni,
-      r.contactEmail,
-      r.totalAmount,
-      r.status,
-      r.createdAt,
-      (
-        SELECT COUNT(*) FROM ReservationItems ri 
-        WHERE ri.reservationId = r.id
-      ) as itemCount,
-      (
-        SELECT MIN(f.functionDate) FROM ReservationItems ri 
-        JOIN FunctionsTable f ON ri.functionId = f.id
-        WHERE ri.reservationId = r.id
-      ) as firstFunctionDate
-    FROM 
-      Reservations r
-    WHERE 
-      r.userId = $1
-    ORDER BY 
-      r.createdAt DESC
-  `;
-  
-  const result = await query(sql, [userId]);
-  
-  return result.rows;
-};
-
 module.exports = {
   checkSeatsAvailabilityPreliminary,
   findReservationByTemporaryId,
@@ -514,5 +479,4 @@ module.exports = {
   getReservationById,
   checkReservationTimeLimit,
   updateReservationStatus,
-  getReservationsByUserId
 };

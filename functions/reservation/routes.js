@@ -13,8 +13,6 @@ router.put('/putReservation/:id/confirm', authMiddleware.verifyToken, reservatio
 
 router.put('/putReservation/:id/cancel', authMiddleware.verifyToken, reservationController.cancelReservation);
 
-router.get('/getUserReservations/user/me', authMiddleware.verifyToken, reservationController.getUserReservations);
-
 router.get('/getReservation/:id/time', reservationController.checkReservationTime);
 
 module.exports = router;

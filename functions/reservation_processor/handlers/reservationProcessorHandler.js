@@ -1,8 +1,18 @@
-const { closeConnection: closeRedisConnection } = require("../config/redis");
+const {
+  redis,
+  closeConnection: closeRedisConnection,
+} = require("../config/redis");
 const { pool } = require("../config/db");
-const { processExpiredReservations, processMessage } = require("../processors/reservationProcessor");
+const {
+  processExpiredReservations,
+  processMessage,
+} = require("../processors/reservationProcessor");
+
+// Variable para controlar si ya se han cerrado las conexiones
+let connectionsClosing = false;
 
 exports.handler = async (event, context) => {
+  // Evitar que Lambda espere a que se cierren las conexiones de eventos
   context.callbackWaitsForEmptyEventLoop = false;
 
   console.log("Evento recibido:", JSON.stringify(event));
@@ -23,40 +33,19 @@ exports.handler = async (event, context) => {
 
     // Procesamiento de mensajes SQS
     const results = [];
-    
+
     if (event.Records && event.Records.length > 0) {
       console.log(`Recibidos ${event.Records.length} mensajes de SQS`);
-      
+
       for (const record of event.Records) {
         console.log(`Procesando mensaje con ID: ${record.messageId}`);
-        console.log("Contenido del registro:", JSON.stringify(record, null, 2));
-        
+
         try {
-          // Verificar que el mensaje tenga un cuerpo válido
-          if (!record.body && !record.Body) {
-            console.error("El mensaje no tiene cuerpo:", record);
-            results.push({
-              messageId: record.messageId,
-              result: {
-                success: false,
-                message: "Mensaje sin cuerpo"
-              }
-            });
-            continue;
-          }
-          
-          // SQS puede enviar la propiedad como 'body' o 'Body' dependiendo de la configuración
-          const messageToProcess = {
-            messageId: record.messageId,
-            Body: record.body || record.Body
-          };
-          
-          console.log("Procesando mensaje:", JSON.stringify(messageToProcess, null, 2));
-          
-          const result = await processMessage(messageToProcess);
+          // Procesar el mensaje (ahora con tolerancia a diferentes formatos)
+          const result = await processMessage(record);
           results.push({
             messageId: record.messageId,
-            result
+            result,
           });
 
           if (result.success) {
@@ -68,11 +57,14 @@ exports.handler = async (event, context) => {
             );
           }
         } catch (error) {
-          console.error(`Error al procesar mensaje ${record.messageId}:`, error);
+          console.error(
+            `Error al procesar mensaje ${record.messageId}:`,
+            error
+          );
           results.push({
             messageId: record.messageId,
             error: error.message,
-            stack: error.stack
+            stack: error.stack,
           });
         }
       }
@@ -95,16 +87,40 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         message: "Error en el procesamiento",
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       }),
     };
   } finally {
     try {
-      // Cerrar conexiones
-      await closeRedisConnection();
-      await pool.end();
+      // Evitar cerrar conexiones múltiples veces
+      if (!connectionsClosing) {
+        connectionsClosing = true;
+        console.log("Cerrando conexiones...");
+
+        try {
+          // Cerrar conexión Redis
+          if (redis && typeof closeRedisConnection === "function") {
+            await closeRedisConnection();
+            console.log("Conexión Redis cerrada correctamente");
+          }
+        } catch (redisError) {
+          console.error("Error al cerrar conexión Redis:", redisError);
+        }
+
+        try {
+          // Cerrar pool de DB solo si no se ha cerrado ya
+          if (pool && typeof pool.end === "function" && !pool.ended) {
+            // Marcar el pool como cerrado antes de cerrarlo para evitar llamadas múltiples
+            pool.ended = true;
+            await pool.end();
+            console.log("Pool de base de datos cerrado correctamente");
+          }
+        } catch (dbError) {
+          console.error("Error al cerrar pool de base de datos:", dbError);
+        }
+      }
     } catch (err) {
-      console.error("Error al cerrar conexiones:", err);
+      console.error("Error general al cerrar conexiones:", err);
     }
   }
 };
