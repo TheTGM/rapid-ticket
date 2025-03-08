@@ -451,6 +451,10 @@ Resources:
           Properties:
             Queue: !GetAtt ReservationQueue.Arn
             BatchSize: 10
+            Enabled: true
+            MaximumBatchingWindowInSeconds: 0
+            ScalingConfig:
+              MaximumConcurrency: 10
 
   ShowsLambda:
     Type: AWS::Serverless::Function
