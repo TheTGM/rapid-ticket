@@ -8,53 +8,58 @@ const e = require("express");
 
 const createReservation = async (req, res, next) => {
   try {
-    const { customerName, customerDni, contactEmail, functionId, seatIds } =
-      req.body;
-
+    console.log("Iniciando proceso de reserva, body:", JSON.stringify(req.body));
+    
+    // Obtener datos de la solicitud
+    const { 
+      customerName, 
+      customerDni, 
+      contactEmail, 
+      functionId, 
+      seatIds 
+    } = req.body;
+    
+    // Obtener el ID de usuario si está autenticado
     const userId = req.user?.id || null;
-
-    if (
-      !customerName ||
-      !customerDni ||
-      !contactEmail ||
-      !functionId ||
-      !Array.isArray(seatIds) ||
-      seatIds.length === 0
-    ) {
+    
+    // Validaciones básicas
+    if (!customerName || !customerDni || !contactEmail || !functionId || !Array.isArray(seatIds) || seatIds.length === 0) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         message: "Faltan datos obligatorios para la reserva",
-        requiredFields: [
-          "customerName",
-          "customerDni",
-          "contactEmail",
-          "functionId",
-          "seatIds",
-        ],
+        requiredFields: ["customerName", "customerDni", "contactEmail", "functionId", "seatIds"]
       });
     }
-
+    
+    // Verificación preliminar de disponibilidad
     try {
-      const preliminaryCheck =
-        await reservationModel.checkSeatsAvailabilityPreliminary(
-          functionId,
-          seatIds
-        );
-
+      console.log(`Realizando verificación preliminar para función ${functionId}, asientos: ${seatIds.join(',')}`);
+      const preliminaryCheck = await reservationModel.checkSeatsAvailabilityPreliminary(
+        functionId, 
+        seatIds
+      );
+      
       if (!preliminaryCheck.available) {
+        console.log("Verificación preliminar: asientos no disponibles", preliminaryCheck.unavailableSeats);
         return res.status(StatusCodes.CONFLICT).json({
           message: "Algunos asientos parecen no estar disponibles",
           data: {
-            unavailableSeats: preliminaryCheck.unavailableSeats,
-          },
+            unavailableSeats: preliminaryCheck.unavailableSeats
+          }
         });
       }
+      
+      console.log("Verificación preliminar exitosa: todos los asientos disponibles");
     } catch (error) {
       console.error("Error en verificación preliminar:", error);
+      // Continuamos aunque falle la verificación preliminar
     }
-
+    
+    // Generar un ID único para la reserva temporal
     const temporaryReservationId = `temp-${uuidv4()}`;
-
-    const reservationMessage = {
+    console.log("ID temporal generado:", temporaryReservationId);
+    
+    // Datos de la reserva
+    const reservationData = {
       temporaryReservationId,
       userId,
       customerName,
@@ -62,27 +67,59 @@ const createReservation = async (req, res, next) => {
       contactEmail,
       functionId,
       seatIds,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
-
-    await sqsService.sendMessage(
-      reservationMessage,
-      "CREATE_RESERVATION",
-      `reservation-${temporaryReservationId}`
-    );
-
+    
+    // Este es el formato correcto que espera el procesador
+    const messageObject = {
+      type: 'CREATE_RESERVATION',
+      data: reservationData,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log("Enviando mensaje a SQS:", JSON.stringify(messageObject, null, 2));
+    
+    // Registrar en BD que estamos procesando esta reserva (opcional)
+    try {
+      await reservationModel.updateProcessingStatus(temporaryReservationId, 'processing');
+    } catch (dbError) {
+      console.warn("No se pudo registrar estado de procesamiento:", dbError.message);
+    }
+    
+    // Enviar a la cola SQS
+    try {
+      const sqsResult = await sqsService.sendMessage(
+        messageObject, // Este objeto será convertido a JSON string en sendMessage
+        'CREATE_RESERVATION',
+        `reservation-${temporaryReservationId}`
+      );
+      
+      console.log("Mensaje enviado a SQS con éxito, MessageId:", sqsResult.MessageId);
+    } catch (sqsError) {
+      console.error("Error al enviar mensaje a SQS:", sqsError);
+      
+      // Si falla el envío a SQS, devolver error
+      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        message: "Error al procesar la solicitud de reserva",
+        error: sqsError.message
+      });
+    }
+    
+    // Generar ticket de reserva con código único temporal
     const ticketCode = generateTicketCode(temporaryReservationId);
-
+    
+    console.log(`Reserva ${temporaryReservationId} enviada para procesamiento, ticket: ${ticketCode}`);
+    
     return res.status(StatusCodes.ACCEPTED).json({
       message: "Solicitud de reserva enviada para procesamiento",
       data: {
         temporaryReservationId,
         ticket: {
           code: ticketCode,
-          status: "processing",
-          expiresIn: "10 minutos (después de confirmación)",
-        },
-      },
+          status: 'processing',
+          expiresIn: "10 minutos (después de confirmación)"
+        }
+      }
     });
   } catch (error) {
     console.error("Error al crear solicitud de reserva:", error);
