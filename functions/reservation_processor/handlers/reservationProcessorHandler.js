@@ -27,6 +27,7 @@ exports.handler = async (event, context) => {
     const results = [];
     console.log("event.Records", event.Records);
     for (const record of event.Records || []) {
+      record = JSON.parse(record);
       console.log(`Procesando mensaje con ID: ${record.messageId}`);
 
       try {
