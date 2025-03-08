@@ -50,6 +50,10 @@ exports.handler = async (event, context) => {
 
           if (result.success) {
             console.log(`Mensaje ${record.messageId} procesado con éxito`);
+
+            const sqsService = require("../services/sqsService");
+            await sqsService.deleteMessage(record.receiptHandle);
+            console.log(`Mensaje ${record.messageId} eliminado de la cola SQS`);
           } else {
             console.error(
               `Error al procesar mensaje ${record.messageId}:`,
