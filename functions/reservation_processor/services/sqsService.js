@@ -42,9 +42,6 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
     // Usar el identificador único como base para el grupo
     const groupId = `${messageType}-${uniqueId}`;
     
-    // Si no se proporciona un ID de deduplicación, generar uno basado en timestamp y contenido
-    const dedupId = deduplicationId || 
-      `${Date.now()}-${Buffer.from(JSON.stringify(messageBody)).toString('base64').substring(0, 8)}`;
     
     // Asegurarse de que messageBody sea convertido a string JSON
     const messageBodyStr = typeof messageBody === 'string' 
@@ -59,13 +56,11 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
       MessageBody: messageBodyStr,
       QueueUrl: queueUrl,
       MessageGroupId: groupId,           // Requerido para colas FIFO con ID único
-      MessageDeduplicationId: dedupId    // Requerido para colas FIFO sin ContentBasedDeduplication
     };
     
     console.log("[SQS] Parámetros de envío:", JSON.stringify({
       QueueUrl: queueUrl,
       MessageGroupId: groupId,
-      MessageDeduplicationId: dedupId
     }));
     
     // Enviar el mensaje
