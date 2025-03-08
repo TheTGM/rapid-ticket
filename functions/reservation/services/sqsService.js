@@ -27,9 +27,6 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
     console.log("[SQS] Enviando mensaje a:", queueUrl);
     console.log("[SQS] Tipo de mensaje:", messageType);
     
-    // Para colas FIFO, necesitamos un ID de grupo y un ID de deduplicación
-    const groupId = `group-${messageType}`;
-    
     // Asegurarse de que messageBody sea convertido a string JSON
     const messageBodyStr = typeof messageBody === 'string' 
       ? messageBody 
@@ -42,12 +39,10 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
     const params = {
       MessageBody: messageBodyStr,
       QueueUrl: queueUrl,
-      MessageGroupId: groupId,           // Requerido para colas FIFO
     };
     
     console.log("[SQS] Parámetros de envío:", JSON.stringify({
       QueueUrl: queueUrl,
-      MessageGroupId: groupId,
     }));
     
     // Enviar el mensaje

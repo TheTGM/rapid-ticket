@@ -26,21 +26,7 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
     
     console.log("[SQS] Enviando mensaje a:", queueUrl);
     console.log("[SQS] Tipo de mensaje:", messageType);
-    
-    // IMPORTANTE: Generar un MessageGroupId único para cada mensaje
-    // Extraer un identificador único del mensaje o generarlo
-    let uniqueId;
-    if (typeof messageBody === 'object') {
-      uniqueId = messageBody.temporaryReservationId || 
-                messageBody.reservationId || 
-                messageBody.id ||
-                `msg-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    } else {
-      uniqueId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-    }
-    
-    // Usar el identificador único como base para el grupo
-    const groupId = `${messageType}-${uniqueId}`;
+
     
     
     // Asegurarse de que messageBody sea convertido a string JSON
@@ -55,12 +41,10 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
     const params = {
       MessageBody: messageBodyStr,
       QueueUrl: queueUrl,
-      MessageGroupId: groupId,           // Requerido para colas FIFO con ID único
     };
     
     console.log("[SQS] Parámetros de envío:", JSON.stringify({
       QueueUrl: queueUrl,
-      MessageGroupId: groupId,
     }));
     
     // Enviar el mensaje
