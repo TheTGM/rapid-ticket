@@ -261,12 +261,11 @@ Resources:
         - !GetAtt ElastiCacheSecurityGroup.GroupId
       CacheSubnetGroupName: !Ref ElastiCacheSubnetGroup
 
-  # SQS (Cola de mensajes FIFO)
+  # SQS (Cola de mensajes)
   ReservationQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationQueue-${AppEnv}.fifo
-      FifoQueue: true
+      QueueName: !Sub ${AppName}-ReservationQueue-${AppEnv}
       ContentBasedDeduplication: true
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600 # 14 días
@@ -277,8 +276,7 @@ Resources:
   ReservationDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${AppName}-ReservationDLQ-${AppEnv}.fifo
-      FifoQueue: true
+      QueueName: !Sub ${AppName}-ReservationDLQ-${AppEnv}
       MessageRetentionPeriod: 1209600 # 14 días
 
   # IAM Roles para Lambdas
