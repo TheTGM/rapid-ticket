@@ -172,6 +172,8 @@ const getFunctionDetails = async (functionId) => {
 
   const functionDetails = functionResult.rows[0];
 
+  console.log("functionDetails", functionDetails);
+
   const sectionsSql = `
     SELECT 
       fs.id as functionSectionId,
