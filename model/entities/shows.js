@@ -1,5 +1,5 @@
 
-export const getAllShows = async (client) => {
+const getAllShows = async (client) => {
     try {
         const result = await client.query("SELECT * FROM shows");
         return result.rows;
@@ -7,4 +7,8 @@ export const getAllShows = async (client) => {
         console.error("Error en la consulta de shows: ", error);
         throw error;
     }
+};
+
+module.exports = {
+    getAllShows,
 };
