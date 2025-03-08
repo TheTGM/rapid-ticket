@@ -8,13 +8,6 @@ AWS.config.update({
 // Crear cliente SQS
 const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
 
-/**
- * Envía un mensaje a la cola SQS para procesamiento
- * @param {Object} messageBody - Cuerpo del mensaje a enviar
- * @param {string} messageType - Tipo de mensaje (ej: 'CREATE_RESERVATION')
- * @param {string} [deduplicationId] - ID para deduplicación (opcional, se genera uno si no se proporciona)
- * @returns {Promise<Object>} Respuesta de SQS
- */
 const sendMessage = async (messageBody, messageType, deduplicationId = null) => {
   try {
     // Obtener URL de la cola de las variables de entorno
@@ -58,12 +51,6 @@ const sendMessage = async (messageBody, messageType, deduplicationId = null) => 
   }
 };
 
-/**
- * Recibe y procesa mensajes de la cola SQS 
- * (esta función es útil para tests o procesamiento manual)
- * @param {number} maxMessages - Número máximo de mensajes a recibir
- * @returns {Promise<Array>} Mensajes recibidos
- */
 const receiveMessages = async (maxMessages = 10) => {
   try {
     // Obtener URL de la cola de las variables de entorno
@@ -97,11 +84,6 @@ const receiveMessages = async (maxMessages = 10) => {
   }
 };
 
-/**
- * Elimina un mensaje de la cola después de procesarlo
- * @param {string} receiptHandle - Receipt handle del mensaje
- * @returns {Promise<Object>} Respuesta de SQS
- */
 const deleteMessage = async (receiptHandle) => {
   try {
     // Obtener URL de la cola de las variables de entorno
