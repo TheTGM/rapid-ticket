@@ -1,59 +1,20 @@
-const express = require("express");
-const { StatusCodes } = require("http-status-codes");
-const { Pool } = require("pg");
-const { showReservationMiddleware } = require("./middleware/validationMiddleware");
-const api = express.Router();
+const express = require('express');
+const router = express.Router();
+const reservationController = require('./controllers/reservationController');
+const authMiddleware = require('./middleware/authMiddleware');
 
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USERNAME,
-  password: process.env.DB_PASSWORD,
-});
+router.post('/createReservation', reservationController.createReservation);
 
-// Endpoint existente
-api.post("/testShow", showReservationMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.body;
-    return res.status(StatusCodes.OK).json({ message: "ok", showId: id });
-  } catch (error) {
-    console.error("error API test show: ", error);
-    next(error);
-  }
-});
+router.get('/status/:temporaryId', reservationController.checkReservationStatus);
 
-api.post("/testBd", async (req, res, next) => {
-  try {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(`CREATE TABLE ReservationProcessing (
-  id SERIAL PRIMARY KEY,
-  temporaryId VARCHAR(100) NOT NULL UNIQUE,
-  status VARCHAR(50) NOT NULL,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+router.get('/getReservation/:id', authMiddleware.verifyToken, reservationController.getReservation);
 
-CREATE TABLE ReservationAttempts (
-  id SERIAL PRIMARY KEY,
-  temporaryId VARCHAR(100) NOT NULL,
-  status VARCHAR(50) NOT NULL,
-  reason TEXT,
-  details JSONB,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);`);
-      console.log(result.rows);
-      return res.status(StatusCodes.OK).json({ message: "ok", result:result.rows });  
-    } finally {
-      client.release();
-    }
-    return res.status(StatusCodes.OK).json({ message: "ok" });
-  } catch (error) {
-    console.error("error API create payment: ", error);
-    next(error);
-  }
-});
+router.put('/putReservation/:id/confirm', authMiddleware.verifyToken, reservationController.confirmReservation);
 
+router.put('/putReservation/:id/cancel', authMiddleware.verifyToken, reservationController.cancelReservation);
 
-module.exports = api;
+router.get('/user/me', authMiddleware.verifyToken, reservationController.getUserReservations);
+
+router.get('/getReservation/:id/time', reservationController.checkReservationTime);
+
+module.exports = router;

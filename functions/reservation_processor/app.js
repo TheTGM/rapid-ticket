@@ -1,3 +1,3 @@
-exports.handler = async (event) => {
-    console.log("event: ", event);
-}
+const { handler } = require('./handlers/reservationProcessorHandler');
+
+module.exports.process = handler;

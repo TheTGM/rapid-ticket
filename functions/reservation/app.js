@@ -2,29 +2,25 @@ const serverlessExpress = require("@codegenie/serverless-express");
 const express = require("express");
 const cors = require("cors");
 const app = express();
+const helmet = require("helmet");
+const errorHandler = require("./middleware/validationMiddleware");
+
 const api = require("./routes");
 
-app.use(cors({ origin: "*" }));
+app.use(helmet());
+app.use(cors());
 app.use(express.json());
 
 app.use("", api);
 
-app.use(function (error, req, res, next) {
-  if (error instanceof Object) {
-    if (error.code) {
-      res.status(error.code).json({
-        error: { message: error.message },
-      });
-    } else {
-      res.status(500).json({
-        error: { ...error },
-      });
-    }
-  } else {
-    res.status(500).json({
-      error: { message: error },
-    });
-  }
+// Ruta para manejar 404
+app.use((req, res) => {
+  res.status(StatusCodes.NOT_FOUND).json({
+    message: "Recurso no encontrado",
+  });
 });
+
+// Middleware para manejo de errores
+app.use(errorHandler);
 
 module.exports.handler = serverlessExpress({ app });
