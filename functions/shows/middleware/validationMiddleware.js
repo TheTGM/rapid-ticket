@@ -1,36 +1,43 @@
 const { StatusCodes } = require("http-status-codes");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
-const showShowsSchema = require("../schema/show_shows.json");
+const errorHandler = (err, req, res, next) => {
+  console.error("Error: ", err);
 
-const schemaValidator = new Ajv();
-addFormats(schemaValidator, { mode: "fast", formats: ["date", "date-time"] });
-// for date time validation   timestamp: "2023-10-12T14:30:00Z", // ISO 8601 format
-
-const showShowsValidator = schemaValidator.compile(showShowsSchema);
-
-let validationMiddleware = (validator, request, response, next) => {
-  const requestPayload = request.body;
-  console.info("requestBody", requestPayload);
-  const validPayload = validator(request.body);
-  if (!validPayload) {
-    console.error("invalid payload", validPayload);
-    response.status(StatusCodes.BAD_REQUEST).json({
-      data: {
-        message: validator.errors[0].message,
-      },
+  // Error de la base de datos
+  if (err.code && (err.code.startsWith("22") || err.code.startsWith("23"))) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      message: "Error en los datos enviados",
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Error en la validación de datos"
+          : err.message,
     });
-  } else next();
+  }
+
+  // Error de validación
+  if (err.name === "ValidationError") {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      message: "Error de validación",
+      error: err.message,
+    });
+  }
+
+  // Error de autenticación
+  if (err.name === "UnauthorizedError") {
+    return res.status(StatusCodes.UNAUTHORIZED).json({
+      message: "No autorizado",
+      error: "Acceso denegado",
+    });
+  }
+
+  // Error por defecto
+  return res.status(err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json({
+    message: "Error en el servidor",
+    error:
+      process.env.NODE_ENV === "production"
+        ? "Ocurrió un error inesperado"
+        : err.message,
+  });
 };
 
-let showShowsMiddleware = (request, response, next) => {
-  return validationMiddleware(
-    showShowsValidator,
-    request,
-    response,
-    next
-  );
-};
-
-module.exports = { showShowsMiddleware };
+module.exports = errorHandler;
