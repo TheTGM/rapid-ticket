@@ -274,79 +274,8 @@ const getFunctionsByShow = async (showId, options = {}) => {
   return await getAllActiveFunctions(queryOptions);
 };
 
-const searchFunctions = async (filters = {}, options = {}) => {
-  const queryOptions = {
-    ...options,
-    ...filters,
-  };
-
-  return await getAllActiveFunctions(queryOptions);
-};
-
-const getFunctionsOccupancyStats = async () => {
-  const sql = `
-    WITH SeatCounts AS (
-      SELECT 
-        ri.functionId,
-        COUNT(*) as reservedSeats
-      FROM 
-        ReservationItems ri
-      WHERE 
-        ri.status = 'confirmed'
-      GROUP BY 
-        ri.functionId
-    ),
-    FunctionCapacity AS (
-      SELECT 
-        fs.functionId,
-        SUM(s.capacity) as totalCapacity
-      FROM 
-        FunctionSections fs
-      JOIN 
-        Sections s ON fs.sectionId = s.id
-      GROUP BY 
-        fs.functionId
-    )
-    SELECT 
-      f.id,
-      f.showId,
-      s.name as showName,
-      f.functionDate,
-      f.functionTime,
-      v.name as venueName,
-      COALESCE(fc.totalCapacity, 0) as totalCapacity,
-      COALESCE(sc.reservedSeats, 0) as reservedSeats,
-      CASE 
-        WHEN fc.totalCapacity > 0 THEN 
-          ROUND((COALESCE(sc.reservedSeats, 0)::NUMERIC / fc.totalCapacity) * 100, 2)
-        ELSE 0
-      END as occupancyPercentage
-    FROM 
-      FunctionsTable f
-    JOIN 
-      Shows s ON f.showId = s.id
-    JOIN 
-      Venues v ON f.venueId = v.id
-    LEFT JOIN 
-      FunctionCapacity fc ON f.id = fc.functionId
-    LEFT JOIN 
-      SeatCounts sc ON f.id = sc.functionId
-    WHERE 
-      f.status = 'scheduled' AND
-      f.functionDate >= CURRENT_DATE
-    ORDER BY 
-      f.functionDate, f.functionTime
-  `;
-
-  const result = await query(sql);
-
-  return result.rows;
-};
-
 module.exports = {
   getAllActiveFunctions,
   getFunctionDetails,
   getFunctionsByShow,
-  searchFunctions,
-  getFunctionsOccupancyStats,
 };

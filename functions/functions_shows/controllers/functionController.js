@@ -153,87 +153,6 @@ const getFunctionsByShow = async (req, res, next) => {
   }
 };
 
-const searchFunctions = async (req, res, next) => {
-  try {
-    const {
-      startDate,
-      endDate,
-      minPrice,
-      maxPrice,
-      showId,
-      venueId,
-      page = 1,
-      limit = 10,
-      sortBy = "functionDate",
-      sortOrder = "ASC",
-    } = req.query;
-
-    const filters = {
-      startDate: startDate || null,
-      endDate: endDate || null,
-      minPrice: minPrice ? parseFloat(minPrice) : null,
-      maxPrice: maxPrice ? parseFloat(maxPrice) : null,
-      showId: showId ? parseInt(showId, 10) : null,
-      venueId: venueId ? parseInt(venueId, 10) : null,
-    };
-
-    const options = {
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      sortBy,
-      sortOrder: sortOrder.toUpperCase(),
-    };
-
-    const cacheKey =
-      `functions:search:page=${options.page}:limit=${options.limit}:sort=${options.sortBy}:order=${options.sortOrder}` +
-      (filters.startDate ? `:startDate=${filters.startDate}` : "") +
-      (filters.endDate ? `:endDate=${filters.endDate}` : "") +
-      (filters.minPrice ? `:minPrice=${filters.minPrice}` : "") +
-      (filters.maxPrice ? `:maxPrice=${filters.maxPrice}` : "") +
-      (filters.showId ? `:showId=${filters.showId}` : "") +
-      (filters.venueId ? `:venueId=${filters.venueId}` : "");
-
-    const cacheTTL = 300; // 5 minutos
-
-    //cache-aside
-    const results = await cacheAside(
-      cacheKey,
-      () => functionModel.searchFunctions(filters, options),
-      cacheTTL
-    );
-
-    return res.status(StatusCodes.OK).json({
-      message: "Búsqueda realizada con éxito",
-      data: results,
-    });
-  } catch (error) {
-    console.error("Error al buscar funciones:", error);
-    next(error);
-  }
-};
-
-const getFunctionsOccupancyStats = async (req, res, next) => {
-  try {
-    const cacheKey = `functions:occupancy-stats`;
-
-    const cacheTTL = 600; // 10 minutos
-
-    const stats = await cacheAside(
-      cacheKey,
-      () => functionModel.getFunctionsOccupancyStats(),
-      cacheTTL
-    );
-
-    return res.status(StatusCodes.OK).json({
-      message: "Estadísticas de ocupación obtenidas con éxito",
-      data: stats,
-    });
-  } catch (error) {
-    console.error("Error al obtener estadísticas de ocupación:", error);
-    next(error);
-  }
-};
-
 const invalidateFunctionsCache = async (req, res, next) => {
   try {
     await invalidateCachePattern("functions:*");
@@ -251,7 +170,5 @@ module.exports = {
   getAllFunctions,
   getFunctionDetails,
   getFunctionsByShow,
-  searchFunctions,
-  getFunctionsOccupancyStats,
   invalidateFunctionsCache,
 };

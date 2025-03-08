@@ -4,14 +4,10 @@ const functionController = require('./controllers/functionController');
 
 router.get('/getAllFunctions', functionController.getAllFunctions);
 
-router.get('/getFunctions/search', functionController.searchFunctions);
-
-router.get('/getFunctionsOccupancyStats', functionController.getFunctionsOccupancyStats);
-
-router.get('/invalidateFunctions/invalidate-cache', functionController.invalidateFunctionsCache);
-
 router.get('/getFunctionsByShow/show/:showId', functionController.getFunctionsByShow);
 
 router.get('/getFunctionDetails/:id', functionController.getFunctionDetails);
+
+router.get('/invalidateFunctions/invalidate-cache', functionController.invalidateFunctionsCache);
 
 module.exports = router;
