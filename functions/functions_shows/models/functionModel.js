@@ -220,6 +220,8 @@ const getFunctionDetails = async (functionId) => {
     functionDetails.venueId,
   ]);
 
+  console.log("seatsResult.rows", seatsResult.rows);
+
   const sectionMap = {};
 
   sectionsResult.rows.forEach((section) => {
