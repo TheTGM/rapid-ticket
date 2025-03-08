@@ -27,7 +27,22 @@ api.post("/testBd", async (req, res, next) => {
   try {
     const client = await pool.connect();
     try {
-      const result = await client.query("SELECT * FROM Shows");
+      const result = await client.query(`CREATE TABLE ReservationProcessing (
+  id SERIAL PRIMARY KEY,
+  temporaryId VARCHAR(100) NOT NULL UNIQUE,
+  status VARCHAR(50) NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ReservationAttempts (
+  id SERIAL PRIMARY KEY,
+  temporaryId VARCHAR(100) NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  reason TEXT,
+  details JSONB,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);`);
       console.log(result.rows);
       return res.status(StatusCodes.OK).json({ message: "ok", result:result.rows });  
     } finally {
